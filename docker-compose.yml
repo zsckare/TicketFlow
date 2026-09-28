@@ -1,0 +1,25 @@
+services:
+
+  events-db:
+    image: postgres:17
+    container_name: ticketflow-events-db
+
+    environment:
+      POSTGRES_DB: ticketflow_events
+      POSTGRES_USER: ticketflow
+      POSTGRES_PASSWORD: ticketflow
+
+    ports:
+      - "5433:5432"
+
+    volumes:
+      - events-db-data:/var/lib/postgresql/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ticketflow -d ticketflow_events"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  events-db-data:
