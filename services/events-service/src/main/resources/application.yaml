@@ -1,0 +1,8 @@
+ktor:
+  deployment:
+    port: 8081
+  application:
+    modules:
+      - com.ticketflow.events.SerializationKt.configureSerialization
+      - com.ticketflow.events.StatusPagesKt.configureStatusPages
+      - com.ticketflow.events.RoutingKt.configureRouting
