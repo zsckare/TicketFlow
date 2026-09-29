@@ -1,0 +1,63 @@
+package com.ticketflow.orders
+
+import com.ticketflow.orders.modules.orders.OrderNotFoundException
+import com.ticketflow.orders.modules.orders.TicketNotAvailableException
+import io.ktor.http.HttpStatusCode
+import io.ktor.server.application.Application
+import io.ktor.server.application.call
+import io.ktor.server.application.install
+import io.ktor.server.plugins.statuspages.StatusPages
+import io.ktor.server.response.respond
+
+fun Application.configureStatusPages() {
+
+    val logger = environment.log
+
+    install(StatusPages) {
+
+        exception<IllegalArgumentException> { call, cause ->
+            call.respond(
+                HttpStatusCode.BadRequest,
+                mapOf(
+                    "error" to
+                            (cause.message ?: "Bad request")
+                ),
+            )
+        }
+
+        exception<OrderNotFoundException> { call, cause ->
+            call.respond(
+                HttpStatusCode.NotFound,
+                mapOf(
+                    "error" to
+                            (cause.message ?: "Order not found")
+                ),
+            )
+        }
+
+        exception<TicketNotAvailableException> { call, cause ->
+            call.respond(
+                HttpStatusCode.Conflict,
+                mapOf(
+                    "error" to
+                            (cause.message ?: "Ticket not available")
+                ),
+            )
+        }
+
+        exception<Throwable> { call, cause ->
+            logger.error(
+                "Unhandled exception",
+                cause,
+            )
+
+            call.respond(
+                HttpStatusCode.InternalServerError,
+                mapOf(
+                    "error" to
+                            "Internal server error"
+                ),
+            )
+        }
+    }
+}
