@@ -1,7 +1,16 @@
-package com.ticketflow.events.modules.venues
+package com.ticketflow.events.modules.sections
 
 import kotlinx.serialization.Serializable
 
+/**
+ * Tipo de sección dentro de un venue.
+ *
+ * GENERAL_ADMISSION:
+ * No existen asientos individuales. Se controla mediante capacidad.
+ *
+ * RESERVED_SEATING:
+ * La sección contiene asientos individuales identificables.
+ */
 @Serializable
 enum class VenueSectionType {
     GENERAL_ADMISSION,

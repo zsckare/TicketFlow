@@ -1,21 +1,35 @@
-package com.ticketflow.events.modules.venues
+package com.ticketflow.events.modules.sections
 
+import com.ticketflow.events.modules.venues.VenuesTable
 import org.jetbrains.exposed.sql.Table
 import org.jetbrains.exposed.sql.javatime.timestampWithTimeZone
 
+/**
+ * Representación Exposed de venue_sections.
+ *
+ * Flyway continúa siendo el responsable de crear
+ * físicamente la tabla.
+ */
 object VenueSectionsTable : Table("venue_sections") {
 
-    val id = uuid("id")
+    val id =
+        uuid("id")
 
     val venueId =
         uuid("venue_id")
             .references(VenuesTable.id)
 
     val name =
-        varchar("name", 150)
+        varchar(
+            name = "name",
+            length = 150,
+        )
 
     val type =
-        varchar("type", 30)
+        varchar(
+            name = "type",
+            length = 30,
+        )
 
     val capacity =
         integer("capacity")

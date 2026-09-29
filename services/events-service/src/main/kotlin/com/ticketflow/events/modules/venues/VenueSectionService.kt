@@ -1,7 +1,12 @@
-package com.ticketflow.events.modules.venues
+package com.ticketflow.events.modules.sections
 
+import com.ticketflow.events.modules.venues.VenueRepository
 import java.util.UUID
 
+/**
+ * Reglas de negocio relacionadas con las secciones
+ * físicas de un venue.
+ */
 class VenueSectionService(
     private val venueRepository: VenueRepository,
     private val repository: VenueSectionRepository,
@@ -31,15 +36,31 @@ class VenueSectionService(
         }
 
         return repository.create(
-            venueId,
-            request.copy(
-                name = request.name.trim(),
-            ),
+            venueId = venueId,
+            request =
+                request.copy(
+                    name = request.name.trim(),
+                ),
         )
     }
 
     fun findByVenue(
         venueId: UUID,
-    ): List<VenueSectionResponse> =
-        repository.findByVenue(venueId)
+    ): List<VenueSectionResponse> {
+
+        require(
+            venueRepository.exists(venueId),
+        ) {
+            "Venue does not exist"
+        }
+
+        return repository.findByVenue(
+            venueId,
+        )
+    }
+
+    fun findById(
+        id: UUID,
+    ): VenueSectionResponse? =
+        repository.findById(id)
 }
