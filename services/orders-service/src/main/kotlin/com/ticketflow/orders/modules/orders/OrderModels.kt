@@ -19,8 +19,10 @@ data class CreateOrderRequest(
 @Serializable
 data class OrderResponse(
     val id: String,
+    val userId: String? = null,
     val inventoryId: String,
     val reservationId: String? = null,
+    val paymentId: String? = null,
     val amount: String,
     val currency: String,
     val status: OrderStatus,

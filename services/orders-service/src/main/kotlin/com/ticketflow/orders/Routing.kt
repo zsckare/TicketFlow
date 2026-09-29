@@ -1,5 +1,6 @@
 package com.ticketflow.orders
 
+import com.ticketflow.orders.clients.payments.PaymentsClient
 import com.ticketflow.orders.clients.tickets.TicketsClient
 import com.ticketflow.orders.modules.orders.OrderRepository
 import com.ticketflow.orders.modules.orders.OrderService
@@ -8,26 +9,23 @@ import io.ktor.server.application.Application
 import io.ktor.server.routing.routing
 
 fun Application.configureRouting() {
+    val config = environment.config
 
-    val ticketsBaseUrl =
-        environment.config
-            .property("services.tickets.baseUrl")
-            .getString()
+    val ticketsClient = TicketsClient(
+        httpClient = serviceHttpClient,
+        baseUrl = config.property("services.tickets.baseUrl").getString(),
+    )
 
-    val ticketsClient =
-        TicketsClient(
-            httpClient = serviceHttpClient,
-            baseUrl = ticketsBaseUrl,
-        )
+    val paymentsClient = PaymentsClient(
+        httpClient = serviceHttpClient,
+        baseUrl = config.property("services.payments.baseUrl").getString(),
+    )
 
-    val orderRepository =
-        OrderRepository()
-
-    val orderService =
-        OrderService(
-            repository = orderRepository,
-            ticketsClient = ticketsClient,
-        )
+    val orderService = OrderService(
+        repository = OrderRepository(),
+        ticketsClient = ticketsClient,
+        paymentsClient = paymentsClient,
+    )
 
     routing {
         orderRoutes(orderService)

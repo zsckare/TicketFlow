@@ -7,11 +7,19 @@ object OrdersTable : Table("orders") {
 
     val id = uuid("id")
 
+    val userId =
+        uuid("user_id")
+            .nullable()
+
     val inventoryId =
         uuid("inventory_id")
 
     val reservationId =
         uuid("reservation_id")
+            .nullable()
+
+    val paymentId =
+        uuid("payment_id")
             .nullable()
 
     val amount =

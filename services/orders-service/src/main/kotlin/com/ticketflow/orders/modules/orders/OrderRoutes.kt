@@ -2,113 +2,63 @@ package com.ticketflow.orders.modules.orders
 
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.call
+import io.ktor.server.auth.authenticate
+import io.ktor.server.auth.jwt.JWTPrincipal
+import io.ktor.server.auth.principal
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
-import io.ktor.server.routing.Route
-import io.ktor.server.routing.get
-import io.ktor.server.routing.post
-import io.ktor.server.routing.route
+import io.ktor.server.routing.*
 import java.util.UUID
 
-fun Route.orderRoutes(
-    service: OrderService,
-) {
+fun Route.orderRoutes(service: OrderService) {
+    authenticate("auth-jwt") {
+        route("/orders") {
+            post {
+                val principal = call.principal<JWTPrincipal>()!!
+                val userId = UUID.fromString(principal.payload.subject)
+                val request = call.receive<CreateOrderRequest>()
+                call.respond(HttpStatusCode.Created, service.create(userId, request))
+            }
 
-    route("/orders") {
+            get {
+                val principal = call.principal<JWTPrincipal>()!!
+                val userId = UUID.fromString(principal.payload.subject)
+                call.respond(service.findForUser(userId, principal.isAdmin()))
+            }
 
-        /**
-         * Creates an Order and reserves its inventory.
-         */
-        post {
-            val request =
-                call.receive<CreateOrderRequest>()
+            get("/{orderId}") {
+                val principal = call.principal<JWTPrincipal>()!!
+                val userId = UUID.fromString(principal.payload.subject)
+                val orderId = parseUuid(call.parameters["orderId"])
+                    ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid orderId"))
+                call.respond(service.findForUser(orderId, userId, principal.isAdmin()))
+            }
 
-            val order =
-                service.create(request)
+            post("/{orderId}/confirm") {
+                val principal = call.principal<JWTPrincipal>()!!
+                val userId = UUID.fromString(principal.payload.subject)
+                val userEmail = principal.payload.getClaim("email").asString()
+                    ?: return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to "JWT has no email claim"))
+                val orderId = parseUuid(call.parameters["orderId"])
+                    ?: return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid orderId"))
+                call.respond(service.confirm(userId, orderId, userEmail, principal.isAdmin()))
+            }
 
-            call.respond(
-                HttpStatusCode.Created,
-                order,
-            )
-        }
-
-        /**
-         * Returns Orders, newest first.
-         */
-        get {
-            call.respond(
-                service.findAll()
-            )
-        }
-
-        /**
-         * Returns one Order.
-         */
-        get("/{orderId}") {
-            val orderId =
-                parseUuid(
-                    call.parameters["orderId"]
-                )
-                    ?: return@get call.respond(
-                        HttpStatusCode.BadRequest,
-                        mapOf(
-                            "error" to
-                                    "Invalid orderId"
-                        ),
-                    )
-
-            call.respond(
-                service.findById(orderId)
-            )
-        }
-
-        /**
-         * Confirms the Order and converts its ticket to SOLD.
-         */
-        post("/{orderId}/confirm") {
-            val orderId =
-                parseUuid(
-                    call.parameters["orderId"]
-                )
-                    ?: return@post call.respond(
-                        HttpStatusCode.BadRequest,
-                        mapOf(
-                            "error" to
-                                    "Invalid orderId"
-                        ),
-                    )
-
-            call.respond(
-                service.confirm(orderId)
-            )
-        }
-
-        /**
-         * Cancels the Order and releases its ticket.
-         */
-        post("/{orderId}/cancel") {
-            val orderId =
-                parseUuid(
-                    call.parameters["orderId"]
-                )
-                    ?: return@post call.respond(
-                        HttpStatusCode.BadRequest,
-                        mapOf(
-                            "error" to
-                                    "Invalid orderId"
-                        ),
-                    )
-
-            call.respond(
-                service.cancel(orderId)
-            )
+            post("/{orderId}/cancel") {
+                val principal = call.principal<JWTPrincipal>()!!
+                val userId = UUID.fromString(principal.payload.subject)
+                val orderId = parseUuid(call.parameters["orderId"])
+                    ?: return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid orderId"))
+                call.respond(service.cancel(userId, orderId, principal.isAdmin()))
+            }
         }
     }
 }
 
-private fun parseUuid(
-    value: String?,
-): UUID? =
+private fun JWTPrincipal.isAdmin(): Boolean =
+    payload.getClaim("role").asString() == "ADMIN"
+
+private fun parseUuid(value: String?): UUID? =
     try {
         value?.let(UUID::fromString)
     } catch (_: IllegalArgumentException) {

@@ -67,6 +67,14 @@ fun Application.configureStatusPages() {
             )
         }
 
+
+        exception<SecurityException> { call, cause ->
+            call.respond(
+                HttpStatusCode.Forbidden,
+                mapOf("error" to (cause.message ?: "Forbidden")),
+            )
+        }
+
         exception<Throwable> { call, cause ->
             logger.error(
                 "Unhandled exception",

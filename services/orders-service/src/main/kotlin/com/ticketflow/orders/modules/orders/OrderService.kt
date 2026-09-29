@@ -1,5 +1,8 @@
 package com.ticketflow.orders.modules.orders
 
+import com.ticketflow.orders.clients.payments.CreatePaymentRequest
+import com.ticketflow.orders.clients.payments.PaymentStatus
+import com.ticketflow.orders.clients.payments.PaymentsClient
 import com.ticketflow.orders.clients.tickets.TicketInventoryStatus
 import com.ticketflow.orders.clients.tickets.TicketsClient
 import java.math.BigDecimal
@@ -8,6 +11,7 @@ import java.util.UUID
 class OrderService(
     private val repository: OrderRepository,
     private val ticketsClient: TicketsClient,
+    private val paymentsClient: PaymentsClient,
 ) {
 
     /**
@@ -17,6 +21,7 @@ class OrderService(
      * remains the authority over inventory availability.
      */
     suspend fun create(
+        userId: UUID,
         request: CreateOrderRequest,
     ): OrderResponse {
 
@@ -47,6 +52,7 @@ class OrderService(
          */
         val order =
             repository.createPending(
+                userId = userId,
                 inventoryId = inventoryId,
                 amount = BigDecimal(inventory.price),
                 currency = inventory.currency,
@@ -150,11 +156,16 @@ class OrderService(
      * RESERVED -> CONFIRMED
      */
     suspend fun confirm(
+        userId: UUID,
         orderId: UUID,
+        userEmail: String,
+        isAdmin: Boolean = false,
     ): OrderResponse {
 
         val order =
             findById(orderId)
+
+        ensureOwner(order, userId, isAdmin)
 
         /*
          * Basic idempotency:
@@ -175,6 +186,29 @@ class OrderService(
                 ?: throw OrderOperationException(
                     "Order has no reservationId"
                 )
+
+        val payment = paymentsClient.create(
+            CreatePaymentRequest(
+                orderId = order.id,
+                userId = userId.toString(),
+                amount = order.amount,
+                currency = order.currency,
+                idempotencyKey = "order-confirm-${order.id}",
+            )
+        )
+
+        if (payment.status != PaymentStatus.SUCCEEDED) {
+            throw OrderOperationException(
+                "Payment was not successful"
+            )
+        }
+
+        repository.attachPayment(
+            orderId = orderId,
+            paymentId = UUID.fromString(payment.id),
+        ) ?: throw OrderOperationException(
+            "Unable to attach payment to order"
+        )
 
         val inventory =
             ticketsClient.confirm(
@@ -203,7 +237,7 @@ class OrderService(
          *
          * Kafka/Outbox/reconciliation will address this later.
          */
-        return repository.markConfirmed(orderId)
+        return repository.markConfirmed(orderId, userEmail)
             ?: throw OrderOperationException(
                 "Unable to mark order as CONFIRMED"
             )
@@ -216,11 +250,21 @@ class OrderService(
      * marked CANCELLED.
      */
     suspend fun cancel(
+        userId: UUID,
         orderId: UUID,
+        isAdmin: Boolean = false,
     ): OrderResponse {
 
         val order =
             findById(orderId)
+
+        ensureOwner(order, userId, isAdmin)
+
+        if (order.paymentId != null) {
+            throw InvalidOrderStateException(
+                "Paid orders cannot be cancelled until refunds are implemented"
+            )
+        }
 
         /*
          * Basic idempotency.
@@ -273,8 +317,31 @@ class OrderService(
                 orderId.toString()
             )
 
-    fun findAll(): List<OrderResponse> =
-        repository.findAll()
+    fun findForUser(
+        userId: UUID,
+        isAdmin: Boolean,
+    ): List<OrderResponse> =
+        if (isAdmin) repository.findAll() else repository.findByUser(userId)
+
+    fun findForUser(
+        orderId: UUID,
+        userId: UUID,
+        isAdmin: Boolean,
+    ): OrderResponse {
+        val order = findById(orderId)
+        ensureOwner(order, userId, isAdmin)
+        return order
+    }
+
+    private fun ensureOwner(
+        order: OrderResponse,
+        userId: UUID,
+        isAdmin: Boolean,
+    ) {
+        if (!isAdmin && order.userId != userId.toString()) {
+            throw SecurityException("Order does not belong to authenticated user")
+        }
+    }
 
     /**
      * Best-effort compensation.

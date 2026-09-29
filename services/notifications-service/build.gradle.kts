@@ -33,6 +33,12 @@ dependencies {
     implementation("org.flywaydb:flyway-core:11.13.0")
     implementation("org.flywaydb:flyway-database-postgresql:11.13.0")
     implementation("io.ktor:ktor-server-cors")
+    implementation("io.ktor:ktor-server-auth")
+    implementation("io.ktor:ktor-server-auth-jwt")
+    implementation("com.auth0:java-jwt:4.5.0")
+
+    // Kafka consumer for asynchronous domain events.
+    implementation("org.apache.kafka:kafka-clients:4.1.0")
 
     testImplementation(kotlin("test"))
     testImplementation(ktorLibs.server.testHost)

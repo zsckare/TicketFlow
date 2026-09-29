@@ -44,6 +44,12 @@ dependencies {
 
     implementation("io.ktor:ktor-server-cors")
 
+    // Kafka publisher for the transactional outbox.
+    implementation("org.apache.kafka:kafka-clients:4.1.0")
+    implementation("io.ktor:ktor-server-auth")
+    implementation("io.ktor:ktor-server-auth-jwt")
+    implementation("com.auth0:java-jwt:4.5.0")
+
     testImplementation(kotlin("test"))
     testImplementation(ktorLibs.server.testHost)
 }
