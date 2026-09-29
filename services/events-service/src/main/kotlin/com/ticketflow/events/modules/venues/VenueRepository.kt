@@ -42,6 +42,24 @@ class VenueRepository {
             .map(::toVenueResponse)
     }
 
+    /**
+     * Comprueba si existe un venue con el ID indicado.
+     *
+     * Se utiliza desde otros componentes del Events Service
+     * para validar referencias a venues.
+     */
+    fun exists(
+        id: UUID,
+    ): Boolean = transaction {
+
+        VenuesTable
+            .selectAll()
+            .where {
+                VenuesTable.id eq id
+            }
+            .limit(1)
+            .any()
+    }
     private fun toVenueResponse(
         row: ResultRow,
     ): VenueResponse =
