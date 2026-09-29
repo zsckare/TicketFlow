@@ -18,16 +18,8 @@ private data class GatewayTarget(
 /**
  * Configura las rutas públicas del API Gateway.
  *
- * El frontend sólo conoce al Gateway:
- *
- * http://localhost:8080/api
- *
- * El Gateway se encarga de redirigir cada petición
- * al microservicio correspondiente.
- *
- * IMPORTANTE:
  * CORS NO se configura aquí.
- * Se configura exclusivamente desde Cors.kt.
+ * Cors.kt es el único responsable de CORS en el Gateway.
  */
 fun Application.configureRouting() {
     val client = HttpClient(CIO)
@@ -57,13 +49,6 @@ fun Application.configureRouting() {
 
         /**
          * Todas las rutas públicas pasan por /api.
-         *
-         * Ejemplos:
-         *
-         * /api/events
-         * /api/auth/login
-         * /api/orders
-         * /api/notifications/me
          */
         route("/api/{...}") {
             handle {
@@ -140,11 +125,11 @@ private fun resolveTarget(
          */
         "inventory" -> {
             /**
-             * Public API:
+             * Public:
              *
              * /api/inventory/events/{eventId}
              *
-             * Internal Tickets API:
+             * Internal:
              *
              * /events/{eventId}/inventory
              */
@@ -177,11 +162,11 @@ private fun resolveTarget(
          */
         "payments" -> {
             /**
-             * Public API:
+             * Public:
              *
              * /api/payments/orders/{orderId}
              *
-             * Internal Payments API:
+             * Internal:
              *
              * /orders/{orderId}/payments
              */
@@ -206,11 +191,11 @@ private fun resolveTarget(
          */
         "notifications" -> {
             /**
-             * Public API:
+             * Public:
              *
              * /api/notifications/users/{userId}
              *
-             * Internal Notifications API:
+             * Internal:
              *
              * /users/{userId}/notifications
              */
@@ -237,23 +222,24 @@ private fun resolveTarget(
 }
 
 /**
- * Actúa como reverse proxy entre el cliente
- * y el microservicio correspondiente.
+ * Reverse proxy del API Gateway.
  *
- * Conserva:
+ * El Gateway recibe la petición del navegador y la
+ * reenvía al microservicio correspondiente.
  *
- * - Método HTTP
- * - Query parameters
- * - Request body
- * - Authorization
- * - Content-Type
- * - Response status
- * - Response body
+ * IMPORTANTE:
  *
- * Los headers CORS devueltos por los microservicios
- * NO se reenvían al navegador.
+ * Los headers relacionados con CORS pertenecen exclusivamente
+ * a la comunicación Browser -> Gateway.
  *
- * El API Gateway es el único responsable de CORS.
+ * Por eso:
+ *
+ * 1. NO reenviamos Origin hacia los microservicios.
+ * 2. NO reenviamos Access-Control-Request-*.
+ * 3. NO copiamos Access-Control-* desde las respuestas
+ *    de los microservicios.
+ *
+ * Cors.kt es el único responsable de CORS hacia el navegador.
  */
 private suspend fun proxy(
     call: ApplicationCall,
@@ -278,9 +264,9 @@ private suspend fun proxy(
     }
 
     /**
-     * Obtenemos el body original de la petición.
+     * Obtenemos el body original.
      *
-     * Para GET normalmente estará vacío.
+     * En GET normalmente estará vacío.
      */
     val body = call.receive<ByteArray>()
 
@@ -288,11 +274,24 @@ private suspend fun proxy(
         method = call.request.httpMethod
 
         /**
-         * Reenviamos los headers originales.
+         * Reenviamos los headers del request.
          *
-         * Host y Content-Length pertenecen a la conexión
-         * Browser -> Gateway y no deben reutilizarse para
-         * Gateway -> Microservice.
+         * No reenviamos:
+         *
+         * Host
+         *   Pertenece al Gateway.
+         *
+         * Content-Length
+         *   Ktor calculará el tamaño correcto.
+         *
+         * Origin
+         *   Es información CORS Browser -> Gateway.
+         *
+         * Access-Control-Request-*
+         *   Son headers utilizados exclusivamente
+         *   durante el preflight CORS.
+         *
+         * Authorization SÍ se conserva.
          */
         call.request.headers.forEach { key, values ->
             val shouldSkip =
@@ -302,6 +301,14 @@ private suspend fun proxy(
                 ) ||
                 key.equals(
                     HttpHeaders.ContentLength,
+                    ignoreCase = true,
+                ) ||
+                key.equals(
+                    HttpHeaders.Origin,
+                    ignoreCase = true,
+                ) ||
+                key.startsWith(
+                    "Access-Control-Request-",
                     ignoreCase = true,
                 )
 
@@ -324,22 +331,10 @@ private suspend fun proxy(
     }
 
     /**
-     * Copiamos los headers devueltos por el microservicio.
+     * Reenviamos los headers de respuesta del microservicio.
      *
-     * IMPORTANTE:
-     *
-     * No reenviamos ningún header Access-Control-*.
-     *
-     * Algunos microservicios todavía tienen su propia
-     * configuración CORS. Si copiáramos esos headers,
-     * Cors.kt del Gateway agregaría nuevamente:
-     *
-     * Access-Control-Allow-Origin
-     *
-     * provocando headers duplicados.
-     *
-     * También ignoramos Vary porque el plugin CORS
-     * del Gateway se encargará de generarlo.
+     * No copiamos headers CORS porque el Gateway
+     * genera sus propios headers mediante Cors.kt.
      */
     response.headers.forEach { key, values ->
         val shouldSkip =
@@ -372,8 +367,8 @@ private suspend fun proxy(
     }
 
     /**
-     * Devolvemos al cliente exactamente el status y
-     * body recibidos desde el microservicio.
+     * Conservamos exactamente el status y body
+     * devueltos por el microservicio.
      */
     call.respondBytes(
         bytes = response.readRawBytes(),
