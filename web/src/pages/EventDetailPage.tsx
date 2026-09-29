@@ -1,188 +1,65 @@
 import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { useEvent, useSections, useSeats, useVenue } from '../features/events/eventQueries'
-import { useEventInventory } from '../features/tickets/ticketQueries'
-import { useCancelOrder, useConfirmOrder, useCreateOrder } from '../features/orders/orderMutations'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { eventsApi } from '../api/eventsApi'
+import { ticketsApi } from '../api/ticketsApi'
+import { ordersApi } from '../api/ordersApi'
+import { ErrorState, Loading } from '../components/Ui'
+import { formatDate, formatMoney } from '../lib/format'
 import type { TicketInventoryResponse } from '../types/tickets'
 import type { OrderResponse } from '../types/orders'
 
-function formatMoney(value: string, currency: string) {
-  return new Intl.NumberFormat('es-MX', { style: 'currency', currency }).format(Number(value))
-}
-
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat('es-MX', { dateStyle: 'full', timeStyle: 'short' }).format(new Date(value))
-}
-
 export function EventDetailPage() {
-  const { eventId } = useParams()
-  const [selectedSectionId, setSelectedSectionId] = useState<string>()
-  const [selectedInventory, setSelectedInventory] = useState<TicketInventoryResponse>()
-  const [activeOrder, setActiveOrder] = useState<OrderResponse>()
+  const { eventId = '' } = useParams()
+  const qc = useQueryClient()
+  const [sectionId, setSectionId] = useState<string>()
+  const [selected, setSelected] = useState<TicketInventoryResponse>()
+  const [order, setOrder] = useState<OrderResponse>()
+  const event = useQuery({ queryKey:['event',eventId], queryFn:()=>eventsApi.getEvent(eventId) })
+  const venue = useQuery({ queryKey:['venue',event.data?.venueId], queryFn:()=>eventsApi.getVenue(event.data!.venueId), enabled:!!event.data })
+  const sections = useQuery({ queryKey:['sections',event.data?.venueId], queryFn:()=>eventsApi.getSections(event.data!.venueId), enabled:!!event.data })
+  const activeSection = sectionId ?? sections.data?.[0]?.id
+  const seats = useQuery({ queryKey:['seats',activeSection], queryFn:()=>eventsApi.getSeats(activeSection!), enabled:!!activeSection })
+  const inventory = useQuery({ queryKey:['inventory',eventId], queryFn:()=>ticketsApi.getEventInventory(eventId) })
+  const refresh = () => qc.invalidateQueries({ queryKey:['inventory',eventId] })
+  const create = useMutation({ mutationFn:ordersApi.create, onSuccess:o=>{setOrder(o); void refresh()} })
+  const confirm = useMutation({ mutationFn:ordersApi.confirm, onSuccess:o=>{setOrder(o); void refresh()} })
+  const cancel = useMutation({ mutationFn:ordersApi.cancel, onSuccess:o=>{setOrder(o); void refresh()} })
+  const map = useMemo(()=>new Map((inventory.data??[]).map(i=>[i.seatId,i])),[inventory.data])
 
-  const eventQuery = useEvent(eventId)
-  const venueQuery = useVenue(eventQuery.data?.venueId)
-  const sectionsQuery = useSections(eventQuery.data?.venueId)
-  const inventoryQuery = useEventInventory(eventId)
-
-  const sections = sectionsQuery.data ?? []
-  const activeSectionId = selectedSectionId ?? sections[0]?.id
-  const seatsQuery = useSeats(activeSectionId)
-
-  const createOrder = useCreateOrder()
-  const confirmOrder = useConfirmOrder()
-  const cancelOrder = useCancelOrder()
-
-  const inventoryBySeat = useMemo(
-    () => new Map((inventoryQuery.data ?? []).map((item) => [item.seatId, item])),
-    [inventoryQuery.data],
-  )
-
-  if (eventQuery.isPending) return <div className="state-message">Cargando evento…</div>
-  if (eventQuery.isError) {
-    return <div className="state-message state-message--error">No fue posible cargar el evento: {eventQuery.error.message}</div>
-  }
-
-  const event = eventQuery.data
-
-  async function handleReserve() {
-    if (!selectedInventory) return
-    setActiveOrder(await createOrder.mutateAsync(selectedInventory.id))
-  }
-
-  async function handleConfirm() {
-    if (!activeOrder) return
-    setActiveOrder(await confirmOrder.mutateAsync(activeOrder.id))
-  }
-
-  async function handleCancel() {
-    if (!activeOrder) return
-    setActiveOrder(await cancelOrder.mutateAsync(activeOrder.id))
-  }
-
-  const mutationError = createOrder.error ?? confirmOrder.error ?? cancelOrder.error
-
-  return (
-    <main className="page">
-      <Link className="back-link" to="/events">← Volver a eventos</Link>
-
-      <section className="event-header">
-        <div>
-          <span className="eyebrow">Evento</span>
-          <h1>{event.name}</h1>
-          {event.description && <p>{event.description}</p>}
-          <div className="event-meta">
-            <span>{formatDate(event.startsAt)}</span>
-            {venueQuery.data && <span>{venueQuery.data.name} · {venueQuery.data.city}</span>}
-          </div>
-        </div>
-        <div className="event-header__badge">LIVE</div>
+  if (event.isPending) return <Loading />
+  if (event.isError) return <ErrorState error={event.error} />
+  return <main className="page">
+    <Link className="back" to="/events">← Eventos</Link>
+    <section className="detail-hero"><span className="eyebrow">Evento</span><h1>{event.data.name}</h1>
+      <p>{event.data.description}</p><div className="meta"><span>{formatDate(event.data.startsAt)}</span>{venue.data&&<span>{venue.data.name} · {venue.data.city}</span>}</div>
+    </section>
+    <div className="booking">
+      <section className="panel">
+        <div className="section-title"><h2>Selecciona tu asiento</h2></div>
+        <div className="tabs">{sections.data?.map(s=><button key={s.id} className={activeSection===s.id?'active':''} onClick={()=>{setSectionId(s.id);setSelected(undefined)}}>{s.name}</button>)}</div>
+        <div className="stage">ESCENARIO</div>
+        <div className="seat-grid">{seats.data?.map(s=>{
+          const inv=map.get(s.id); const available=inv?.status==='AVAILABLE'
+          return <button key={s.id} disabled={!available||!!order} onClick={()=>setSelected(inv)}
+            className={`seat ${available?'available':'unavailable'} ${selected?.id===inv?.id?'selected':''}`}>
+            <b>{s.row}{s.number}</b><small>{inv?.status??'SIN BOLETO'}</small>
+          </button>
+        })}</div>
       </section>
-
-      <div className="booking-layout">
-        <section className="seat-panel">
-          <div className="section-heading">
-            <div><span className="eyebrow">Boletos</span><h2>Selecciona tu asiento</h2></div>
-          </div>
-
-          <div className="section-tabs">
-            {sections.map((section) => (
-              <button
-                className={section.id === activeSectionId ? 'section-tab section-tab--active' : 'section-tab'}
-                key={section.id}
-                onClick={() => {
-                  setSelectedSectionId(section.id)
-                  setSelectedInventory(undefined)
-                }}
-                type="button"
-              >
-                {section.name}
-              </button>
-            ))}
-          </div>
-
-          <div className="stage">ESCENARIO</div>
-
-          {seatsQuery.isPending || inventoryQuery.isPending ? (
-            <div className="state-message">Cargando asientos…</div>
-          ) : (
-            <div className="seat-grid">
-              {(seatsQuery.data ?? []).map((seat) => {
-                const inventory = inventoryBySeat.get(seat.id)
-                const available = inventory?.status === 'AVAILABLE'
-                const selected = selectedInventory?.id === inventory?.id
-                return (
-                  <button
-                    className={['seat', available ? 'seat--available' : 'seat--unavailable', selected ? 'seat--selected' : ''].filter(Boolean).join(' ')}
-                    disabled={!available || Boolean(activeOrder)}
-                    key={seat.id}
-                    onClick={() => setSelectedInventory(inventory)}
-                    type="button"
-                    title={inventory ? `${seat.row}-${seat.number}: ${inventory.status}` : `${seat.row}-${seat.number}: sin inventario`}
-                  >
-                    <strong>{seat.row}{seat.number}</strong>
-                    <small>{inventory?.status ?? 'NO INVENTORY'}</small>
-                  </button>
-                )
-              })}
-            </div>
-          )}
-
-          <div className="legend">
-            <span><i className="legend-dot legend-dot--available" /> Disponible</span>
-            <span><i className="legend-dot legend-dot--selected" /> Seleccionado</span>
-            <span><i className="legend-dot legend-dot--sold" /> No disponible</span>
-          </div>
-        </section>
-
-        <aside className="checkout-card">
-          <span className="eyebrow">Tu selección</span>
-          <h2>Resumen</h2>
-
-          {!selectedInventory && !activeOrder ? (
-            <p className="muted">Selecciona un asiento disponible para continuar.</p>
-          ) : (
-            <>
-              {selectedInventory && (
-                <div className="price-row">
-                  <span>Precio</span>
-                  <strong>{formatMoney(selectedInventory.price, selectedInventory.currency)}</strong>
-                </div>
-              )}
-
-              {activeOrder && (
-                <div className="order-status">
-                  <span>Orden</span>
-                  <strong>{activeOrder.status}</strong>
-                  <small>{activeOrder.id}</small>
-                </div>
-              )}
-
-              {!activeOrder && selectedInventory && (
-                <button className="button button--primary button--full" disabled={createOrder.isPending} onClick={() => void handleReserve()} type="button">
-                  {createOrder.isPending ? 'Reservando…' : 'Reservar asiento'}
-                </button>
-              )}
-
-              {activeOrder?.status === 'RESERVED' && (
-                <div className="action-stack">
-                  <button className="button button--primary button--full" disabled={confirmOrder.isPending} onClick={() => void handleConfirm()} type="button">
-                    {confirmOrder.isPending ? 'Confirmando…' : 'Confirmar compra'}
-                  </button>
-                  <button className="button button--secondary button--full" disabled={cancelOrder.isPending} onClick={() => void handleCancel()} type="button">
-                    {cancelOrder.isPending ? 'Cancelando…' : 'Cancelar reservación'}
-                  </button>
-                </div>
-              )}
-
-              {activeOrder?.status === 'CONFIRMED' && <div className="success-box">Compra confirmada. El boleto ahora está vendido.</div>}
-              {activeOrder?.status === 'CANCELLED' && <div className="info-box">Reservación cancelada. El asiento volvió a estar disponible.</div>}
-            </>
-          )}
-
-          {mutationError && <div className="error-box">{mutationError.message}</div>}
-        </aside>
-      </div>
-    </main>
-  )
+      <aside className="panel checkout"><span className="eyebrow">Resumen</span><h2>Tu boleto</h2>
+        {!selected&&!order&&<p className="muted">Selecciona un asiento disponible.</p>}
+        {selected&&<div className="price"><span>Precio</span><b>{formatMoney(selected.price,selected.currency)}</b></div>}
+        {order&&<div className="order-box"><small>ORDEN</small><b>{order.status}</b><code>{order.id}</code></div>}
+        {!order&&selected&&<button className="button primary full" disabled={create.isPending} onClick={()=>create.mutate(selected.id)}>Reservar</button>}
+        {order?.status==='RESERVED'&&<div className="stack">
+          <button className="button primary full" onClick={()=>confirm.mutate(order.id)}>Confirmar compra</button>
+          <button className="button secondary full" onClick={()=>cancel.mutate(order.id)}>Cancelar</button>
+        </div>}
+        {order?.status==='CONFIRMED'&&<div className="alert success">Compra confirmada.</div>}
+        {order?.status==='CANCELLED'&&<div className="alert info">Reservación cancelada.</div>}
+        {(create.error||confirm.error||cancel.error)&&<ErrorState error={(create.error||confirm.error||cancel.error)!}/>}
+      </aside>
+    </div>
+  </main>
 }

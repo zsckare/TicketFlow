@@ -1,18 +1,12 @@
 import { apiRequest } from './httpClient'
 import type { OrderResponse } from '../types/orders'
-
-const BASE_URL = import.meta.env.VITE_ORDERS_API_URL
-
+const BASE = import.meta.env.VITE_ORDERS_API_URL
 export const ordersApi = {
-  create: (inventoryId: string) =>
-    apiRequest<OrderResponse>(`${BASE_URL}/orders`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ inventoryId }),
-    }),
-  get: (orderId: string) => apiRequest<OrderResponse>(`${BASE_URL}/orders/${orderId}`),
-  confirm: (orderId: string) =>
-    apiRequest<OrderResponse>(`${BASE_URL}/orders/${orderId}/confirm`, { method: 'POST' }),
-  cancel: (orderId: string) =>
-    apiRequest<OrderResponse>(`${BASE_URL}/orders/${orderId}/cancel`, { method: 'POST' }),
+  getAll: () => apiRequest<OrderResponse[]>(`${BASE}/orders`),
+  get: (id: string) => apiRequest<OrderResponse>(`${BASE}/orders/${id}`),
+  create: (inventoryId: string) => apiRequest<OrderResponse>(`${BASE}/orders`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ inventoryId }),
+  }),
+  confirm: (id: string) => apiRequest<OrderResponse>(`${BASE}/orders/${id}/confirm`, { method: 'POST' }),
+  cancel: (id: string) => apiRequest<OrderResponse>(`${BASE}/orders/${id}/cancel`, { method: 'POST' }),
 }

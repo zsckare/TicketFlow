@@ -1,11 +1,12 @@
 import { apiRequest } from './httpClient'
-import type { TicketInventoryResponse } from '../types/tickets'
-
-const BASE_URL = import.meta.env.VITE_TICKETS_API_URL
-
+import type { CreateInventoryRequest, TicketInventoryResponse } from '../types/tickets'
+const BASE = import.meta.env.VITE_TICKETS_API_URL
 export const ticketsApi = {
   getEventInventory: (eventId: string) =>
-    apiRequest<TicketInventoryResponse[]>(`${BASE_URL}/events/${eventId}/inventory`),
-  getInventory: (inventoryId: string) =>
-    apiRequest<TicketInventoryResponse>(`${BASE_URL}/inventory/${inventoryId}`),
+    apiRequest<TicketInventoryResponse[]>(`${BASE}/events/${eventId}/inventory`),
+  getInventory: (id: string) => apiRequest<TicketInventoryResponse>(`${BASE}/inventory/${id}`),
+  createInventory: (body: CreateInventoryRequest) =>
+    apiRequest<TicketInventoryResponse>(`${BASE}/inventory`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    }),
 }

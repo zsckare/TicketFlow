@@ -1,25 +1,50 @@
 export class ApiError extends Error {
-  constructor(message: string, public readonly status: number) {
+  readonly status: number
+
+  constructor(message: string, status: number) {
     super(message)
     this.name = 'ApiError'
+    this.status = status
   }
 }
 
-export async function apiRequest<T>(url: string, options?: RequestInit): Promise<T> {
+export async function apiRequest<T>(
+  url: string,
+  options?: RequestInit,
+): Promise<T> {
   const response = await fetch(url, {
     ...options,
-    headers: { Accept: 'application/json', ...options?.headers },
+    headers: {
+      Accept: 'application/json',
+      ...options?.headers,
+    },
   })
 
   if (!response.ok) {
     let message = `Request failed with status ${response.status}`
+
     try {
-      const body = (await response.json()) as { error?: string }
-      if (body.error) message = body.error
+      const body = (await response.json()) as {
+        error?: string
+        message?: string
+      }
+
+      message =
+        body.error ??
+        body.message ??
+        message
     } catch {
-      // The backend may return a non-JSON error.
+      // El backend puede regresar un error que no sea JSON.
     }
-    throw new ApiError(message, response.status)
+
+    throw new ApiError(
+      message,
+      response.status,
+    )
+  }
+
+  if (response.status === 204) {
+    return undefined as T
   }
 
   return (await response.json()) as T

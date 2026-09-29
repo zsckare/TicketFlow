@@ -10,25 +10,15 @@ export interface EventResponse {
   endsAt: string
   status: EventStatus
 }
-
-export interface VenueResponse {
-  id: string
-  name: string
-  address: string
-  city: string
-}
-
+export interface VenueResponse { id: string; name: string; address: string; city: string }
 export interface VenueSectionResponse {
-  id: string
-  venueId: string
-  name: string
-  type: VenueSectionType
-  capacity: number
+  id: string; venueId: string; name: string; type: VenueSectionType; capacity: number
 }
+export interface SeatResponse { id: string; sectionId: string; row: string; number: string }
 
-export interface SeatResponse {
-  id: string
-  sectionId: string
-  row: string
-  number: string
+export interface CreateVenueRequest { name: string; address: string; city: string }
+export interface CreateSectionRequest { name: string; type: VenueSectionType; capacity: number }
+export interface CreateSeatRequest { row: string; number: string }
+export interface CreateEventRequest {
+  venueId: string; name: string; description?: string; startsAt: string; endsAt: string
 }
