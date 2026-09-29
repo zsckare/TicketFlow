@@ -16,6 +16,9 @@ fun Route.orderRoutes(
 
     route("/orders") {
 
+        /**
+         * Creates an Order and reserves its inventory.
+         */
         post {
             val request =
                 call.receive<CreateOrderRequest>()
@@ -29,12 +32,18 @@ fun Route.orderRoutes(
             )
         }
 
+        /**
+         * Returns Orders, newest first.
+         */
         get {
             call.respond(
                 service.findAll()
             )
         }
 
+        /**
+         * Returns one Order.
+         */
         get("/{orderId}") {
             val orderId =
                 parseUuid(
@@ -50,6 +59,48 @@ fun Route.orderRoutes(
 
             call.respond(
                 service.findById(orderId)
+            )
+        }
+
+        /**
+         * Confirms the Order and converts its ticket to SOLD.
+         */
+        post("/{orderId}/confirm") {
+            val orderId =
+                parseUuid(
+                    call.parameters["orderId"]
+                )
+                    ?: return@post call.respond(
+                        HttpStatusCode.BadRequest,
+                        mapOf(
+                            "error" to
+                                    "Invalid orderId"
+                        ),
+                    )
+
+            call.respond(
+                service.confirm(orderId)
+            )
+        }
+
+        /**
+         * Cancels the Order and releases its ticket.
+         */
+        post("/{orderId}/cancel") {
+            val orderId =
+                parseUuid(
+                    call.parameters["orderId"]
+                )
+                    ?: return@post call.respond(
+                        HttpStatusCode.BadRequest,
+                        mapOf(
+                            "error" to
+                                    "Invalid orderId"
+                        ),
+                    )
+
+            call.respond(
+                service.cancel(orderId)
             )
         }
     }

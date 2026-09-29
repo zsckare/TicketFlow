@@ -1,5 +1,7 @@
 package com.ticketflow.events.modules.venues
 
+import java.util.UUID
+
 /**
  * Contiene las reglas de negocio relacionadas con venues.
  *
@@ -9,6 +11,9 @@ class VenueService(
     private val repository: VenueRepository,
 ) {
 
+    /**
+     * Crea un nuevo venue.
+     */
     fun create(
         request: CreateVenueRequest,
     ): VenueResponse {
@@ -32,6 +37,19 @@ class VenueService(
         )
     }
 
+    /**
+     * Obtiene todos los venues.
+     */
     fun findAll(): List<VenueResponse> =
         repository.findAll()
+
+    /**
+     * Obtiene un venue concreto.
+     *
+     * Retorna null cuando el venue no existe.
+     */
+    fun findById(
+        venueId: UUID,
+    ): VenueResponse? =
+        repository.findById(venueId)
 }

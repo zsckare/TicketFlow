@@ -3,10 +3,9 @@ package com.ticketflow.orders.clients.tickets
 import kotlinx.serialization.Serializable
 
 /**
- * Local representation of the contract exposed by Tickets Service.
+ * Local representation of Tickets Service inventory status.
  *
- * We intentionally do not share the Tickets Service model classes.
- * Orders owns its representation of the remote API contract.
+ * Orders Service deliberately owns its copy of the remote contract.
  */
 @Serializable
 enum class TicketInventoryStatus {
@@ -34,5 +33,10 @@ data class ReserveTicketResponse(
 
 @Serializable
 data class ReleaseTicketRequest(
+    val reservationId: String,
+)
+
+@Serializable
+data class ConfirmTicketRequest(
     val reservationId: String,
 )

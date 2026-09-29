@@ -2,6 +2,7 @@ package com.ticketflow.orders.modules.orders
 
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -20,9 +21,7 @@ class OrderRepository {
     ): OrderResponse =
         transaction {
             val now =
-                OffsetDateTime.now(
-                    ZoneOffset.UTC
-                )
+                OffsetDateTime.now(ZoneOffset.UTC)
 
             val id =
                 UUID.randomUUID()
@@ -40,29 +39,102 @@ class OrderRepository {
             findByIdInternal(id)!!
         }
 
+    /**
+     * PENDING -> RESERVED
+     *
+     * The status predicate prevents an unexpected state from
+     * being overwritten.
+     */
     fun markReserved(
         orderId: UUID,
         reservationId: UUID,
-    ): OrderResponse =
+    ): OrderResponse? =
         transaction {
-            OrdersTable.update({
-                OrdersTable.id eq orderId
-            }) {
-                it[OrdersTable.reservationId] =
-                    reservationId
+            val updated =
+                OrdersTable.update({
+                    (OrdersTable.id eq orderId) and
+                            (OrdersTable.status eq OrderStatus.PENDING.name)
+                }) {
+                    it[OrdersTable.reservationId] =
+                        reservationId
 
-                it[status] =
-                    OrderStatus.RESERVED.name
+                    it[status] =
+                        OrderStatus.RESERVED.name
 
-                it[updatedAt] =
-                    OffsetDateTime.now(
-                        ZoneOffset.UTC
-                    )
+                    it[failureReason] = null
+
+                    it[updatedAt] =
+                        OffsetDateTime.now(ZoneOffset.UTC)
+                }
+
+            if (updated == 0) {
+                null
+            } else {
+                findByIdInternal(orderId)
             }
-
-            findByIdInternal(orderId)!!
         }
 
+    /**
+     * RESERVED -> CONFIRMED
+     */
+    fun markConfirmed(
+        orderId: UUID,
+    ): OrderResponse? =
+        transaction {
+            val updated =
+                OrdersTable.update({
+                    (OrdersTable.id eq orderId) and
+                            (OrdersTable.status eq OrderStatus.RESERVED.name)
+                }) {
+                    it[status] =
+                        OrderStatus.CONFIRMED.name
+
+                    it[failureReason] = null
+
+                    it[updatedAt] =
+                        OffsetDateTime.now(ZoneOffset.UTC)
+                }
+
+            if (updated == 0) {
+                null
+            } else {
+                findByIdInternal(orderId)
+            }
+        }
+
+    /**
+     * RESERVED -> CANCELLED
+     */
+    fun markCancelled(
+        orderId: UUID,
+    ): OrderResponse? =
+        transaction {
+            val updated =
+                OrdersTable.update({
+                    (OrdersTable.id eq orderId) and
+                            (OrdersTable.status eq OrderStatus.RESERVED.name)
+                }) {
+                    it[status] =
+                        OrderStatus.CANCELLED.name
+
+                    it[failureReason] = null
+
+                    it[updatedAt] =
+                        OffsetDateTime.now(ZoneOffset.UTC)
+                }
+
+            if (updated == 0) {
+                null
+            } else {
+                findByIdInternal(orderId)
+            }
+        }
+
+    /**
+     * Marks an order as FAILED.
+     *
+     * Used when the distributed workflow cannot be completed.
+     */
     fun markFailed(
         orderId: UUID,
         reason: String,
@@ -75,12 +147,10 @@ class OrderRepository {
                     OrderStatus.FAILED.name
 
                 it[failureReason] =
-                    reason
+                    reason.take(500)
 
                 it[updatedAt] =
-                    OffsetDateTime.now(
-                        ZoneOffset.UTC
-                    )
+                    OffsetDateTime.now(ZoneOffset.UTC)
             }
 
             findByIdInternal(orderId)!!
@@ -97,6 +167,10 @@ class OrderRepository {
         transaction {
             OrdersTable
                 .selectAll()
+                .orderBy(
+                    OrdersTable.createdAt to
+                            org.jetbrains.exposed.sql.SortOrder.DESC
+                )
                 .map(::toResponse)
         }
 
@@ -116,20 +190,16 @@ class OrderRepository {
     ): OrderResponse =
         OrderResponse(
             id =
-                row[OrdersTable.id]
-                    .toString(),
+                row[OrdersTable.id].toString(),
 
             inventoryId =
-                row[OrdersTable.inventoryId]
-                    .toString(),
+                row[OrdersTable.inventoryId].toString(),
 
             reservationId =
-                row[OrdersTable.reservationId]
-                    ?.toString(),
+                row[OrdersTable.reservationId]?.toString(),
 
             amount =
-                row[OrdersTable.amount]
-                    .toPlainString(),
+                row[OrdersTable.amount].toPlainString(),
 
             currency =
                 row[OrdersTable.currency],
@@ -143,11 +213,9 @@ class OrderRepository {
                 row[OrdersTable.failureReason],
 
             createdAt =
-                row[OrdersTable.createdAt]
-                    .toString(),
+                row[OrdersTable.createdAt].toString(),
 
             updatedAt =
-                row[OrdersTable.updatedAt]
-                    .toString(),
+                row[OrdersTable.updatedAt].toString(),
         )
 }

@@ -40,7 +40,7 @@ dependencies {
 
     implementation("org.flywaydb:flyway-core:11.13.0")
     implementation("org.flywaydb:flyway-database-postgresql:11.13.0")
-
+    implementation("io.ktor:ktor-server-cors")
 
     testImplementation(kotlin("test"))
     testImplementation(ktorLibs.server.testHost)

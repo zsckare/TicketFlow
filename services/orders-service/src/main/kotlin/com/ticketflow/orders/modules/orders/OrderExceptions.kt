@@ -10,3 +10,11 @@ class TicketNotAvailableException :
     RuntimeException(
         "Ticket is not available"
     )
+
+class InvalidOrderStateException(
+    message: String,
+) : RuntimeException(message)
+
+class OrderOperationException(
+    message: String,
+) : RuntimeException(message)

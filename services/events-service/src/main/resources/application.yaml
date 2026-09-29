@@ -7,6 +7,7 @@ ktor:
       - com.ticketflow.events.SerializationKt.configureSerialization
       - com.ticketflow.events.StatusPagesKt.configureStatusPages
       - com.ticketflow.events.DatabaseKt.configureDatabase
+      - com.ticketflow.events.CorsKt.configureCors
       - com.ticketflow.events.RoutingKt.configureRouting
 
 database:

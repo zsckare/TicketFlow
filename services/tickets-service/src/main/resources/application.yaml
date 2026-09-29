@@ -8,6 +8,7 @@ ktor:
       - com.ticketflow.tickets.StatusPagesKt.configureStatusPages
       - com.ticketflow.tickets.DatabaseKt.configureDatabase
       - com.ticketflow.tickets.HttpClientsKt.configureHttpClients
+      - com.ticketflow.tickets.CorsKt.configureCors
       - com.ticketflow.tickets.RoutingKt.configureRouting
 
 services:

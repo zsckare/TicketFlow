@@ -1,6 +1,8 @@
 package com.ticketflow.orders
 
+import com.ticketflow.orders.modules.orders.InvalidOrderStateException
 import com.ticketflow.orders.modules.orders.OrderNotFoundException
+import com.ticketflow.orders.modules.orders.OrderOperationException
 import com.ticketflow.orders.modules.orders.TicketNotAvailableException
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.Application
@@ -41,6 +43,26 @@ fun Application.configureStatusPages() {
                 mapOf(
                     "error" to
                             (cause.message ?: "Ticket not available")
+                ),
+            )
+        }
+
+        exception<InvalidOrderStateException> { call, cause ->
+            call.respond(
+                HttpStatusCode.Conflict,
+                mapOf(
+                    "error" to
+                            (cause.message ?: "Invalid order state")
+                ),
+            )
+        }
+
+        exception<OrderOperationException> { call, cause ->
+            call.respond(
+                HttpStatusCode.Conflict,
+                mapOf(
+                    "error" to
+                            (cause.message ?: "Order operation failed")
                 ),
             )
         }

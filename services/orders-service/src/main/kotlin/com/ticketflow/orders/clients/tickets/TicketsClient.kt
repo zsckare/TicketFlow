@@ -9,11 +9,19 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 
+/**
+ * HTTP client responsible for communication with Tickets Service.
+ *
+ * Orders Service never accesses tickets_db directly.
+ */
 class TicketsClient(
     private val httpClient: HttpClient,
     private val baseUrl: String,
 ) {
 
+    /**
+     * Retrieves an inventory item.
+     */
     suspend fun findInventoryById(
         inventoryId: String,
     ): TicketInventoryResponse? {
@@ -36,6 +44,11 @@ class TicketsClient(
         }
     }
 
+    /**
+     * Attempts to reserve an inventory item.
+     *
+     * Conflict means somebody else already reserved or sold it.
+     */
     suspend fun reserve(
         inventoryId: String,
     ): ReserveTicketResponse? {
@@ -48,9 +61,7 @@ class TicketsClient(
             HttpStatusCode.OK ->
                 response.body()
 
-            HttpStatusCode.Conflict ->
-                null
-
+            HttpStatusCode.Conflict,
             HttpStatusCode.NotFound ->
                 null
 
@@ -61,6 +72,11 @@ class TicketsClient(
         }
     }
 
+    /**
+     * Releases an existing reservation.
+     *
+     * This is also the compensating action used by the Order saga.
+     */
     suspend fun release(
         inventoryId: String,
         reservationId: String,
@@ -73,6 +89,41 @@ class TicketsClient(
 
                 setBody(
                     ReleaseTicketRequest(
+                        reservationId = reservationId,
+                    )
+                )
+            }
+
+        return when (response.status) {
+            HttpStatusCode.OK ->
+                response.body()
+
+            HttpStatusCode.Conflict,
+            HttpStatusCode.NotFound ->
+                null
+
+            else ->
+                error(
+                    "Tickets Service returned ${response.status}"
+                )
+        }
+    }
+
+    /**
+     * Converts a RESERVED ticket into SOLD.
+     */
+    suspend fun confirm(
+        inventoryId: String,
+        reservationId: String,
+    ): TicketInventoryResponse? {
+        val response =
+            httpClient.post(
+                "$baseUrl/inventory/$inventoryId/confirm"
+            ) {
+                contentType(ContentType.Application.Json)
+
+                setBody(
+                    ConfirmTicketRequest(
                         reservationId = reservationId,
                     )
                 )

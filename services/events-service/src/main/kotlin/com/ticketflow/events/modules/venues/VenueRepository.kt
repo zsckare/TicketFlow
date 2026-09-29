@@ -1,6 +1,5 @@
 package com.ticketflow.events.modules.venues
 
-
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
@@ -35,11 +34,32 @@ class VenueRepository {
         )
     }
 
+    /**
+     * Obtiene todos los venues.
+     */
     fun findAll(): List<VenueResponse> = transaction {
 
         VenuesTable
             .selectAll()
             .map(::toVenueResponse)
+    }
+
+    /**
+     * Obtiene un venue por su ID.
+     *
+     * Retorna null cuando el venue no existe.
+     */
+    fun findById(
+        id: UUID,
+    ): VenueResponse? = transaction {
+
+        VenuesTable
+            .selectAll()
+            .where {
+                VenuesTable.id eq id
+            }
+            .singleOrNull()
+            ?.let(::toVenueResponse)
     }
 
     /**
@@ -60,6 +80,7 @@ class VenueRepository {
             .limit(1)
             .any()
     }
+
     private fun toVenueResponse(
         row: ResultRow,
     ): VenueResponse =
