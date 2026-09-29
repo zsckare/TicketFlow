@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { useAuth } from '../features/auth/AuthContext'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { eventsApi } from '../api/eventsApi'
 import { ticketsApi } from '../api/ticketsApi'
@@ -12,6 +13,9 @@ import type { OrderResponse } from '../types/orders'
 export function EventDetailPage() {
   const { eventId = '' } = useParams()
   const qc = useQueryClient()
+  const { user } = useAuth()
+  const navigate = useNavigate()
+  const location = useLocation()
   const [sectionId, setSectionId] = useState<string>()
   const [selected, setSelected] = useState<TicketInventoryResponse>()
   const [order, setOrder] = useState<OrderResponse>()
@@ -51,7 +55,7 @@ export function EventDetailPage() {
         {!selected&&!order&&<p className="muted">Selecciona un asiento disponible.</p>}
         {selected&&<div className="price"><span>Precio</span><b>{formatMoney(selected.price,selected.currency)}</b></div>}
         {order&&<div className="order-box"><small>ORDEN</small><b>{order.status}</b><code>{order.id}</code></div>}
-        {!order&&selected&&<button className="button primary full" disabled={create.isPending} onClick={()=>create.mutate(selected.id)}>Reservar</button>}
+        {!order&&selected&&<button className="button primary full" disabled={create.isPending} onClick={()=>{ if (!user) { navigate('/login', { state: { from: location.pathname } }); return } create.mutate(selected.id) }}> {user ? 'Reservar' : 'Inicia sesión para reservar'}</button>}
         {order?.status==='RESERVED'&&<div className="stack">
           <button className="button primary full" onClick={()=>confirm.mutate(order.id)}>Confirmar compra</button>
           <button className="button secondary full" onClick={()=>cancel.mutate(order.id)}>Cancelar</button>

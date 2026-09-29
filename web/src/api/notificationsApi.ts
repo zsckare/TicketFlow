@@ -1,0 +1,1 @@
+import {apiRequest} from './httpClient';import type {NotificationResponse} from '../types/notifications';export const notificationsApi={mine:()=>apiRequest<NotificationResponse[]>('/notifications/me')}
