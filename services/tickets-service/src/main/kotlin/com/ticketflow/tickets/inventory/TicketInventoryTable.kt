@@ -18,8 +18,13 @@ object TicketInventoryTable : Table("ticket_inventory") {
     val eventId =
         uuid("event_id")
 
+    val sectionId =
+        uuid("section_id")
+            .nullable()
+
     val seatId =
         uuid("seat_id")
+            .nullable()
 
     val price =
         decimal(
@@ -27,6 +32,13 @@ object TicketInventoryTable : Table("ticket_inventory") {
             precision = 12,
             scale = 2,
         )
+
+    val priceOverride =
+        decimal(
+            name = "price_override",
+            precision = 12,
+            scale = 2,
+        ).nullable()
 
     val currency =
         varchar(

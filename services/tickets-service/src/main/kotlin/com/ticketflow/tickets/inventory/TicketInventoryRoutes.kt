@@ -6,6 +6,7 @@ import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
+import io.ktor.server.routing.put
 import java.util.UUID
 
 /**
@@ -56,6 +57,28 @@ fun Route.ticketInventoryRoutes(
                 "released" to released,
             ),
         )
+    }
+
+    /** Configure a complete section before the event is published. */
+    put("/inventory/events/{eventId}/sections") {
+        val eventId = call.parameters["eventId"] ?: return@put call.respond(HttpStatusCode.BadRequest)
+        val request = call.receive<ConfigureSectionInventoryRequest>()
+        call.respond(HttpStatusCode.OK, service.configureSection(eventId, request))
+    }
+
+    /** Returns the commercial configuration for every configured section. */
+    get("/inventory/events/{eventId}/sections") {
+        val eventId = parseUuid(call.parameters["eventId"])
+            ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid event ID"))
+        call.respond(service.findSectionConfigs(eventId))
+    }
+
+    /** Adds, changes or removes an individual seat price override. */
+    put("/inventory/events/{eventId}/seats/{seatId}/price") {
+        val eventId = call.parameters["eventId"] ?: return@put call.respond(HttpStatusCode.BadRequest)
+        val seatId = call.parameters["seatId"] ?: return@put call.respond(HttpStatusCode.BadRequest)
+        val request = call.receive<UpdateSeatPriceRequest>()
+        call.respond(service.updateSeatPrice(eventId, seatId, request))
     }
 
     /**

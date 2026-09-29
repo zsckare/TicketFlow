@@ -2,20 +2,13 @@ package com.ticketflow.tickets.modules.inventory
 
 import kotlinx.serialization.Serializable
 
-/**
- * Estados posibles del inventario.
- */
 @Serializable
-enum class TicketInventoryStatus {
-    AVAILABLE,
-    RESERVED,
-    SOLD,
-}
+enum class TicketInventoryStatus { AVAILABLE, RESERVED, SOLD }
 
-/**
- * Request utilizado para crear inventario para un asiento
- * dentro de un evento.
- */
+@Serializable
+enum class InventorySectionType { GENERAL_ADMISSION, RESERVED_SEATING }
+
+/** Legacy single-seat creation request. Kept for compatibility. */
 @Serializable
 data class CreateTicketInventoryRequest(
     val eventId: String,
@@ -24,51 +17,51 @@ data class CreateTicketInventoryRequest(
     val currency: String,
 )
 
-/**
- * Representación pública de un registro de inventario.
- */
+/** Configures all sellable inventory for a section of a DRAFT event. */
+@Serializable
+data class ConfigureSectionInventoryRequest(
+    val sectionId: String,
+    val basePrice: String,
+    val currency: String,
+    /** GA may sell fewer tickets than the physical section capacity. */
+    val quantity: Int? = null,
+)
+
+@Serializable
+data class UpdateSeatPriceRequest(
+    /** null removes the override and restores the section base price. */
+    val priceOverride: String? = null,
+)
+
+@Serializable
+data class EventSectionInventoryResponse(
+    val eventId: String,
+    val sectionId: String,
+    val sectionType: InventorySectionType,
+    val basePrice: String,
+    val currency: String,
+    val capacity: Int,
+)
+
 @Serializable
 data class TicketInventoryResponse(
     val id: String,
     val eventId: String,
-    val seatId: String,
+    val sectionId: String? = null,
+    val seatId: String? = null,
     val price: String,
+    val priceOverride: String? = null,
     val currency: String,
     val status: TicketInventoryStatus,
     val reservationId: String? = null,
     val reservedUntil: String? = null,
 )
 
-/**
- * Resultado de reservar temporalmente un ticket.
- */
 @Serializable
-data class ReserveTicketResponse(
-    val inventory: TicketInventoryResponse,
-)
+data class ReserveTicketResponse(val inventory: TicketInventoryResponse)
 
-/**
- * Request para liberar una reservación.
- *
- * reservationId funciona como token de ownership:
- * solamente quien posee la reservación puede liberarla.
- */
 @Serializable
-data class ReleaseTicketRequest(
-    val reservationId: String,
-)
+data class ReleaseTicketRequest(val reservationId: String)
 
-/**
- * Request para confirmar una reservación.
- *
- * Por ahora confirmar significa convertir:
- *
- * RESERVED -> SOLD
- *
- * Más adelante esta transición estará coordinada
- * por Orders/Payments.
- */
 @Serializable
-data class ConfirmTicketRequest(
-    val reservationId: String,
-)
+data class ConfirmTicketRequest(val reservationId: String)

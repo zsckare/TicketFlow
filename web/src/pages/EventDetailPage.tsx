@@ -23,13 +23,15 @@ export function EventDetailPage() {
   const venue = useQuery({ queryKey:['venue',event.data?.venueId], queryFn:()=>eventsApi.getVenue(event.data!.venueId), enabled:!!event.data })
   const sections = useQuery({ queryKey:['sections',event.data?.venueId], queryFn:()=>eventsApi.getSections(event.data!.venueId), enabled:!!event.data })
   const activeSection = sectionId ?? sections.data?.[0]?.id
+  const activeSectionData = sections.data?.find(s => s.id === activeSection)
   const seats = useQuery({ queryKey:['seats',activeSection], queryFn:()=>eventsApi.getSeats(activeSection!), enabled:!!activeSection })
   const inventory = useQuery({ queryKey:['inventory',eventId], queryFn:()=>ticketsApi.getEventInventory(eventId) })
   const refresh = () => qc.invalidateQueries({ queryKey:['inventory',eventId] })
   const create = useMutation({ mutationFn:ordersApi.create, onSuccess:o=>{setOrder(o); void refresh()} })
   const confirm = useMutation({ mutationFn:ordersApi.confirm, onSuccess:o=>{setOrder(o); void refresh()} })
   const cancel = useMutation({ mutationFn:ordersApi.cancel, onSuccess:o=>{setOrder(o); void refresh()} })
-  const map = useMemo(()=>new Map((inventory.data??[]).map(i=>[i.seatId,i])),[inventory.data])
+  const map = useMemo(()=>new Map((inventory.data??[]).filter(i=>i.seatId).map(i=>[i.seatId!,i])),[inventory.data])
+  const generalAvailable = useMemo(() => (inventory.data ?? []).filter(i => i.sectionId === activeSection && !i.seatId && i.status === 'AVAILABLE'), [inventory.data, activeSection])
 
   if (event.isPending) return <Loading />
   if (event.isError) return <ErrorState error={event.error} />
@@ -43,13 +45,20 @@ export function EventDetailPage() {
         <div className="section-title"><h2>Selecciona tu asiento</h2></div>
         <div className="tabs">{sections.data?.map(s=><button key={s.id} className={activeSection===s.id?'active':''} onClick={()=>{setSectionId(s.id);setSelected(undefined)}}>{s.name}</button>)}</div>
         <div className="stage">ESCENARIO</div>
-        <div className="seat-grid">{seats.data?.map(s=>{
-          const inv=map.get(s.id); const available=inv?.status==='AVAILABLE'
-          return <button key={s.id} disabled={!available||!!order} onClick={()=>setSelected(inv)}
-            className={`seat ${available?'available':'unavailable'} ${selected?.id===inv?.id?'selected':''}`}>
-            <b>{s.row}{s.number}</b><small>{inv?.status??'SIN BOLETO'}</small>
-          </button>
-        })}</div>
+        {activeSectionData?.type === 'GENERAL_ADMISSION' ?
+          <div className="panel">
+            <h3>Admisión general</h3>
+            <p className="muted">{generalAvailable.length} boletos disponibles</p>
+            {generalAvailable[0] && <button className="button primary" disabled={!!order} onClick={()=>setSelected(generalAvailable[0])}>Seleccionar boleto</button>}
+            {!generalAvailable.length && <div className="alert info">No hay boletos disponibles en esta sección.</div>}
+          </div> :
+          <div className="seat-grid">{seats.data?.map(s=>{
+            const inv=map.get(s.id); const available=inv?.status==='AVAILABLE'
+            return <button key={s.id} disabled={!available||!!order} onClick={()=>setSelected(inv)}
+              className={`seat ${available?'available':'unavailable'} ${selected?.id===inv?.id?'selected':''}`}>
+              <b>{s.row}{s.number}</b><small>{inv?.status??'SIN BOLETO'}</small>
+            </button>
+          })}</div>}
       </section>
       <aside className="panel checkout"><span className="eyebrow">Resumen</span><h2>Tu boleto</h2>
         {!selected&&!order&&<p className="muted">Selecciona un asiento disponible.</p>}

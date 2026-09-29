@@ -104,4 +104,14 @@ class EventsClient(
                 )
         }
     }
+
+    /** Lists the physical seats that belong to a section. */
+    suspend fun findSeatsBySection(sectionId: String): List<SeatResponse> {
+        val response = httpClient.get("$baseUrl/sections/$sectionId/seats")
+        return when (response.status) {
+            HttpStatusCode.OK -> response.body<List<SeatResponse>>()
+            HttpStatusCode.NotFound -> emptyList()
+            else -> error("Events Service returned unexpected status while loading section seats: ${response.status}")
+        }
+    }
 }

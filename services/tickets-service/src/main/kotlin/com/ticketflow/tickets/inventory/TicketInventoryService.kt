@@ -64,10 +64,10 @@ class TicketInventoryService(
             )
 
         require(
-            event.status ==
-                    EventStatus.PUBLISHED,
+            event.status == EventStatus.DRAFT ||
+                    event.status == EventStatus.PUBLISHED,
         ) {
-            "Ticket inventory can only be created for published events"
+            "Ticket inventory can only be created for draft or published events"
         }
 
         /*
@@ -332,4 +332,55 @@ class TicketInventoryService(
             now,
         )
     }
+
+    /** Configures a complete event section and generates its sellable units. */
+    suspend fun configureSection(eventIdValue: String, request: ConfigureSectionInventoryRequest): EventSectionInventoryResponse {
+        val eventId = parseId(eventIdValue, "event")
+        val sectionId = parseId(request.sectionId, "section")
+        val event = eventsClient.findEventById(eventId.toString()) ?: throw IllegalArgumentException("Event does not exist")
+        require(event.status == EventStatus.DRAFT) { "Section inventory can only be configured while the event is DRAFT" }
+        val section = eventsClient.findSectionById(sectionId.toString()) ?: throw IllegalArgumentException("Section does not exist")
+        require(section.venueId == event.venueId) { "Section does not belong to the event venue" }
+        val basePrice = request.basePrice.toBigDecimalOrNull() ?: throw IllegalArgumentException("Invalid base price")
+        require(basePrice >= BigDecimal.ZERO) { "Base price cannot be negative" }
+        val currency = request.currency.trim().uppercase()
+        require(currency.length == 3 && currency.all(Char::isLetter)) { "Currency must be a 3-letter code" }
+
+        val type = InventorySectionType.valueOf(section.type.name)
+        val seats = if (type == InventorySectionType.RESERVED_SEATING) {
+            eventsClient.findSeatsBySection(sectionId.toString())
+        } else emptyList()
+        if (type == InventorySectionType.RESERVED_SEATING) {
+            require(seats.isNotEmpty()) { "Reserved seating section has no seats" }
+        }
+        val capacity = if (type == InventorySectionType.GENERAL_ADMISSION) {
+            request.quantity ?: section.capacity
+        } else seats.size
+        require(capacity in 1..section.capacity) { "Quantity must be between 1 and the section capacity" }
+
+        return repository.configureSection(
+            eventId, sectionId, type, basePrice, currency, capacity,
+            seats.map { UUID.fromString(it.id) },
+        )
+    }
+
+    fun findSectionConfigs(eventId: UUID): List<EventSectionInventoryResponse> =
+        repository.findSectionConfigs(eventId)
+
+    suspend fun updateSeatPrice(eventIdValue: String, seatIdValue: String, request: UpdateSeatPriceRequest): TicketInventoryResponse {
+        val eventId = parseId(eventIdValue, "event")
+        val seatId = parseId(seatIdValue, "seat")
+        val event = eventsClient.findEventById(eventId.toString()) ?: throw IllegalArgumentException("Event does not exist")
+        require(event.status == EventStatus.DRAFT) { "Seat prices can only be changed while the event is DRAFT" }
+        val override = request.priceOverride?.let {
+            it.toBigDecimalOrNull() ?: throw IllegalArgumentException("Invalid price override")
+        }
+        require(override == null || override >= BigDecimal.ZERO) { "Price override cannot be negative" }
+        return repository.updateSeatOverride(eventId, seatId, override)
+            ?: throw IllegalArgumentException("Seat inventory does not exist for this event")
+    }
+
+    private fun parseId(value: String, name: String): UUID =
+        runCatching { UUID.fromString(value) }.getOrElse { throw IllegalArgumentException("Invalid $name ID") }
+
 }

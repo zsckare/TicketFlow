@@ -18,7 +18,7 @@ enum class TicketInventoryStatus {
 data class TicketInventoryResponse(
     val id: String,
     val eventId: String,
-    val seatId: String,
+    val seatId: String? = null,
     val price: String,
     val currency: String,
     val status: TicketInventoryStatus,
