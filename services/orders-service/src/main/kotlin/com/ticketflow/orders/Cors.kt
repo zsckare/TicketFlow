@@ -17,12 +17,12 @@ fun Application.configureCors() {
     install(CORS) {
 
         allowHost(
-            "localhost:5173",
+            "localhost:5174",
             schemes = listOf("http"),
         )
 
         allowHost(
-            "127.0.0.1:5173",
+            "127.0.0.1:5174",
             schemes = listOf("http"),
         )
 

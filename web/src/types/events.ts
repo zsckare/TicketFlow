@@ -1,0 +1,34 @@
+export type EventStatus = 'DRAFT' | 'PUBLISHED' | 'CANCELLED' | 'FINISHED'
+export type VenueSectionType = 'GENERAL_ADMISSION' | 'RESERVED_SEATING'
+
+export interface EventResponse {
+  id: string
+  venueId: string
+  name: string
+  description?: string | null
+  startsAt: string
+  endsAt: string
+  status: EventStatus
+}
+
+export interface VenueResponse {
+  id: string
+  name: string
+  address: string
+  city: string
+}
+
+export interface VenueSectionResponse {
+  id: string
+  venueId: string
+  name: string
+  type: VenueSectionType
+  capacity: number
+}
+
+export interface SeatResponse {
+  id: string
+  sectionId: string
+  row: string
+  number: string
+}
