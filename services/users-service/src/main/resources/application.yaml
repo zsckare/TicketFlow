@@ -1,0 +1,19 @@
+ktor:
+  deployment:
+    port: 8084
+  application:
+    modules:
+      - com.ticketflow.users.SerializationKt.configureSerialization
+      - com.ticketflow.users.StatusPagesKt.configureStatusPages
+      - com.ticketflow.users.DatabaseKt.configureDatabase
+      - com.ticketflow.users.RoutingKt.configureRouting
+database:
+  jdbcUrl: "$DB_JDBC_URL:jdbc:postgresql://localhost:5436/ticketflow_users"
+  username: "$DB_USERNAME:ticketflow"
+  password: "$DB_PASSWORD:ticketflow"
+  maximumPoolSize: "$DB_MAX_POOL_SIZE:10"
+jwt:
+  secret: "$JWT_SECRET:ticketflow-dev-secret-change-me"
+  issuer: "$JWT_ISSUER:ticketflow-users"
+  audience: "$JWT_AUDIENCE:ticketflow-api"
+  expiresMinutes: "$JWT_EXPIRES_MINUTES:60"

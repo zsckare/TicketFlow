@@ -1,0 +1,6 @@
+package com.ticketflow.notifications
+import org.jetbrains.exposed.sql.*
+import org.jetbrains.exposed.sql.transactions.transaction
+import java.time.OffsetDateTime
+import java.util.UUID
+class NotificationRepository{fun create(r:CreateNotificationRequest)=transaction{val id=UUID.randomUUID();NotificationsTable.insert{it[NotificationsTable.id]=id;it[userId]=UUID.fromString(r.userId);it[type]=r.type;it[destination]=r.destination;it[subject]=r.subject;it[body]=r.body;it[status]=NotificationStatus.SENT.name;it[createdAt]=OffsetDateTime.now()};find(id)!!};fun find(id:UUID)=transaction{NotificationsTable.selectAll().where{NotificationsTable.id eq id}.singleOrNull()?.response()};fun byUser(id:UUID)=transaction{NotificationsTable.selectAll().where{NotificationsTable.userId eq id}.orderBy(NotificationsTable.createdAt,SortOrder.DESC).map{it.response()}};private fun ResultRow.response()=NotificationResponse(this[NotificationsTable.id].toString(),this[NotificationsTable.userId].toString(),this[NotificationsTable.type],this[NotificationsTable.destination],this[NotificationsTable.subject],this[NotificationsTable.body],NotificationStatus.valueOf(this[NotificationsTable.status]),this[NotificationsTable.createdAt].toString())}

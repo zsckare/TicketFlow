@@ -1,0 +1,16 @@
+ktor:
+  deployment:
+    port: 8080
+  application:
+    modules:
+      - com.ticketflow.gateway.SerializationKt.configureSerialization
+      - com.ticketflow.gateway.StatusPagesKt.configureStatusPages
+      - com.ticketflow.gateway.DatabaseKt.configureDatabase
+      - com.ticketflow.gateway.RoutingKt.configureRouting
+services:
+  events: "$EVENTS_SERVICE_URL:http://localhost:8081"
+  tickets: "$TICKETS_SERVICE_URL:http://localhost:8082"
+  orders: "$ORDERS_SERVICE_URL:http://localhost:8083"
+  users: "$USERS_SERVICE_URL:http://localhost:8084"
+  payments: "$PAYMENTS_SERVICE_URL:http://localhost:8085"
+  notifications: "$NOTIFICATIONS_SERVICE_URL:http://localhost:8086"

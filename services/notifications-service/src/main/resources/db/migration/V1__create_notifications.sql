@@ -1,0 +1,1 @@
+CREATE TABLE notifications(id UUID PRIMARY KEY,user_id UUID NOT NULL,type VARCHAR(50) NOT NULL,destination VARCHAR(320) NOT NULL,subject VARCHAR(200) NOT NULL,body TEXT NOT NULL,status VARCHAR(30) NOT NULL,created_at TIMESTAMPTZ NOT NULL,CONSTRAINT ck_notification_status CHECK(status IN ('PENDING','SENT','FAILED')));CREATE INDEX idx_notifications_user ON notifications(user_id);
