@@ -141,10 +141,10 @@ class TicketInventoryService(
      */
     fun findById(
         inventoryId: UUID,
-    ): TicketInventoryResponse? =
-        repository.findById(
-            inventoryId,
-        )
+    ): TicketInventoryResponse? {
+        releaseExpired()
+        return repository.findById(inventoryId)
+    }
 
     /**
      * Obtiene todo el inventario perteneciente
@@ -152,10 +152,44 @@ class TicketInventoryService(
      */
     fun findByEvent(
         eventId: UUID,
-    ): List<TicketInventoryResponse> =
-        repository.findByEvent(
-            eventId,
+    ): List<TicketInventoryResponse> {
+        releaseExpired()
+        return repository.findByEvent(eventId)
+    }
+
+    /**
+     * Indica si un evento tiene una configuración comercial mínima
+     * para poder publicarse. Tickets Service es el propietario de
+     * esta decisión porque es quien conoce el inventario vendible.
+     */
+    fun getReadiness(
+        eventId: UUID,
+    ): EventInventoryReadinessResponse {
+        val sections = repository.findSectionConfigs(eventId)
+        val inventory = repository.findByEvent(eventId)
+        val available = inventory.count { it.status == TicketInventoryStatus.AVAILABLE }
+
+        val reasons = buildList {
+            if (sections.isEmpty()) {
+                add("No sections are configured for sale")
+            }
+            if (inventory.isEmpty()) {
+                add("No ticket inventory exists")
+            }
+            if (available == 0) {
+                add("No ticket inventory is available")
+            }
+        }
+
+        return EventInventoryReadinessResponse(
+            eventId = eventId.toString(),
+            ready = reasons.isEmpty(),
+            configuredSections = sections.size,
+            totalInventory = inventory.size,
+            availableInventory = available,
+            reasons = reasons,
         )
+    }
 
     /**
      * Intenta reservar temporalmente un ticket.
@@ -321,6 +355,11 @@ class TicketInventoryService(
      *
      * Retorna la cantidad de tickets liberados.
      */
+    /** Restocks a SOLD unit after Orders has successfully refunded its payment. */
+    fun restockSold(inventoryId: UUID): TicketInventoryResponse =
+        repository.restockSold(inventoryId)
+            ?: throw TicketInventoryConflictException("Ticket is not SOLD")
+
     fun releaseExpired(): Int {
 
         val now =

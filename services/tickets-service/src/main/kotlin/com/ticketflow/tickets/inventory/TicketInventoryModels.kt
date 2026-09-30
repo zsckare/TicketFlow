@@ -44,6 +44,16 @@ data class EventSectionInventoryResponse(
 )
 
 @Serializable
+data class EventInventoryReadinessResponse(
+    val eventId: String,
+    val ready: Boolean,
+    val configuredSections: Int,
+    val totalInventory: Int,
+    val availableInventory: Int,
+    val reasons: List<String>,
+)
+
+@Serializable
 data class TicketInventoryResponse(
     val id: String,
     val eventId: String,

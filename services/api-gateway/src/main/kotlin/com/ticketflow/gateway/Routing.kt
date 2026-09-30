@@ -9,6 +9,10 @@ import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 private data class GatewayTarget(
     val baseUrl: String,
@@ -52,8 +56,29 @@ fun Application.configureRouting() {
          */
         route("/api/{...}") {
             handle {
+                val requestPath = call.request.path()
+                val publishEventId = requestPath
+                    .removePrefix("/api/events/")
+                    .takeIf {
+                        call.request.httpMethod == HttpMethod.Post &&
+                            requestPath.startsWith("/api/events/") &&
+                            it.endsWith("/publish")
+                    }
+                    ?.removeSuffix("/publish")
+                    ?.takeIf { it.isNotBlank() && !it.contains('/') }
+
+                if (publishEventId != null) {
+                    return@handle publishEvent(
+                        call = call,
+                        client = client,
+                        eventId = publishEventId,
+                        eventsBaseUrl = services.getValue("events"),
+                        ticketsBaseUrl = services.getValue("tickets"),
+                    )
+                }
+
                 val target = resolveTarget(
-                    requestPath = call.request.path(),
+                    requestPath = requestPath,
                     services = services,
                 ) ?: return@handle call.respond(
                     HttpStatusCode.NotFound,
@@ -219,6 +244,81 @@ private fun resolveTarget(
 
         else -> null
     }
+}
+
+/**
+ * Publica un evento sólo cuando Tickets Service confirma que existe
+ * inventario vendible. El Gateway orquesta; ningún servicio accede
+ * a la base de datos de otro servicio.
+ */
+private suspend fun publishEvent(
+    call: ApplicationCall,
+    client: HttpClient,
+    eventId: String,
+    eventsBaseUrl: String,
+    ticketsBaseUrl: String,
+) {
+    val readinessUrl =
+        "${ticketsBaseUrl.trimEnd('/')}/inventory/events/$eventId/readiness"
+
+    val readiness = runCatching {
+        client.get(readinessUrl)
+    }.getOrElse {
+        return call.respond(
+            HttpStatusCode.BadGateway,
+            mapOf("error" to "Tickets Service is unavailable"),
+        )
+    }
+
+    if (!readiness.status.isSuccess()) {
+        return call.respondBytes(
+            bytes = readiness.readRawBytes(),
+            contentType = readiness.contentType(),
+            status = readiness.status,
+        )
+    }
+
+    val readinessBody = readiness.bodyAsText()
+    val readinessJson = runCatching {
+        Json.parseToJsonElement(readinessBody).jsonObject
+    }.getOrElse {
+        return call.respond(
+            HttpStatusCode.BadGateway,
+            mapOf("error" to "Invalid readiness response from Tickets Service"),
+        )
+    }
+
+    val ready = readinessJson["ready"]?.jsonPrimitive?.boolean ?: false
+
+    if (!ready) {
+        return call.respondBytes(
+            bytes = readinessBody.encodeToByteArray(),
+            contentType = ContentType.Application.Json,
+            status = HttpStatusCode.Conflict,
+        )
+    }
+
+    val publishUrl =
+        "${eventsBaseUrl.trimEnd('/')}/events/$eventId/publish"
+
+    val response = runCatching {
+        client.post(publishUrl) {
+            call.request.headers[HttpHeaders.Authorization]?.let { token ->
+                header(HttpHeaders.Authorization, token)
+            }
+        }
+    }.getOrElse {
+        return call.respond(
+            HttpStatusCode.BadGateway,
+            mapOf("error" to "Events Service is unavailable"),
+        )
+    }
+
+    call.respondBytes(
+        bytes = response.readRawBytes(),
+        contentType = response.contentType(),
+        status = response.status,
+    )
 }
 
 /**

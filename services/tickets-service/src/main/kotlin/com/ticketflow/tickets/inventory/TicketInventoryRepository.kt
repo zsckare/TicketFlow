@@ -209,6 +209,19 @@ if (excess > 0) {
         if (updated == 0) null else findByIdInternal(inventoryId)
     }
 
+    fun restockSold(inventoryId: UUID): TicketInventoryResponse? = transaction {
+        val updated = TicketInventoryTable.update({
+            (TicketInventoryTable.id eq inventoryId) and
+                (TicketInventoryTable.status eq TicketInventoryStatus.SOLD.name)
+        }) {
+            it[status] = TicketInventoryStatus.AVAILABLE.name
+            it[reservationId] = null
+            it[reservedUntil] = null
+            it[updatedAt] = OffsetDateTime.now()
+        }
+        if (updated == 0) null else findByIdInternal(inventoryId)
+    }
+
     fun releaseExpired(now: OffsetDateTime): Int = transaction {
         TicketInventoryTable.update({
             (TicketInventoryTable.status eq TicketInventoryStatus.RESERVED.name) and

@@ -26,6 +26,18 @@ fun Route.orderRoutes(service: OrderService) {
                 call.respond(service.findForUser(userId, principal.isAdmin()))
             }
 
+            get("/tickets/me") {
+                val principal = call.principal<JWTPrincipal>()!!
+                call.respond(service.findTickets(UUID.fromString(principal.payload.subject)))
+            }
+
+            post("/tickets/check-in") {
+                val principal = call.principal<JWTPrincipal>()!!
+                val request = call.receive<CheckInRequest>()
+                val token = parseUuid(request.admissionToken) ?: return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid admission token"))
+                call.respond(service.checkIn(token, principal.isAdmin()))
+            }
+
             get("/{orderId}") {
                 val principal = call.principal<JWTPrincipal>()!!
                 val userId = UUID.fromString(principal.payload.subject)

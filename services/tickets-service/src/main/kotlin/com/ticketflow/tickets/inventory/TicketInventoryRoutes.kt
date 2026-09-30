@@ -66,6 +66,21 @@ fun Route.ticketInventoryRoutes(
         call.respond(HttpStatusCode.OK, service.configureSection(eventId, request))
     }
 
+    /**
+     * GET /inventory/events/{eventId}/readiness
+     *
+     * Used by the API Gateway before publishing an event.
+     */
+    get("/inventory/events/{eventId}/readiness") {
+        val eventId = parseUuid(call.parameters["eventId"])
+            ?: return@get call.respond(
+                HttpStatusCode.BadRequest,
+                mapOf("error" to "Invalid event ID"),
+            )
+
+        call.respond(service.getReadiness(eventId))
+    }
+
     /** Returns the commercial configuration for every configured section. */
     get("/inventory/events/{eventId}/sections") {
         val eventId = parseUuid(call.parameters["eventId"])
@@ -241,6 +256,13 @@ fun Route.ticketInventoryRoutes(
             HttpStatusCode.OK,
             inventory,
         )
+    }
+
+    /** Internal compensation used after a successful payment refund. */
+    post("/inventory/{inventoryId}/restock") {
+        val inventoryId = parseUuid(call.parameters["inventoryId"])
+            ?: return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid inventory ID"))
+        call.respond(HttpStatusCode.OK, service.restockSold(inventoryId))
     }
 
     /**

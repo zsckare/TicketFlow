@@ -143,4 +143,13 @@ class TicketsClient(
                 )
         }
     }
+
+    suspend fun restock(inventoryId: String): TicketInventoryResponse? {
+        val response = httpClient.post("$baseUrl/inventory/$inventoryId/restock")
+        return when (response.status) {
+            HttpStatusCode.OK -> response.body()
+            HttpStatusCode.Conflict, HttpStatusCode.NotFound -> null
+            else -> error("Tickets Service returned ${response.status}")
+        }
+    }
 }
