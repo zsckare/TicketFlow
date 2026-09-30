@@ -1,5 +1,6 @@
 package com.ticketflow.events.modules.venues
 
+import java.time.ZoneId
 import java.util.UUID
 
 /**
@@ -30,10 +31,14 @@ class VenueService(
             "Venue city cannot be blank"
         }
 
+        val timezone = request.timezone.trim().ifBlank { "America/Monterrey" }
+        require(runCatching { ZoneId.of(timezone) }.isSuccess) { "Invalid IANA timezone" }
+
         return repository.create(
             name = request.name.trim(),
             address = request.address.trim(),
             city = request.city.trim(),
+            timezone = timezone,
         )
     }
 

@@ -30,6 +30,11 @@ object VenuesTable : Table("venues") {
         length = 150,
     )
 
+    val timezone = varchar(
+        name = "timezone",
+        length = 80,
+    )
+
     val createdAt =
         timestampWithTimeZone("created_at")
 

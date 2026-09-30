@@ -98,7 +98,7 @@ export const ordersApi = {
                 successUrl:
                     `${window.location.origin}/checkout/success?orderId=${encodeURIComponent(id)}`,
                 cancelUrl:
-                    `${window.location.origin}/cart`,
+                    `${window.location.origin}/checkout/cancel?orderId=${encodeURIComponent(id)}`,
             }),
         ),
 

@@ -15,6 +15,7 @@ class VenueRepository {
         name: String,
         address: String,
         city: String,
+        timezone: String,
     ): VenueResponse = transaction {
 
         val venueId = UUID.randomUUID()
@@ -24,6 +25,7 @@ class VenueRepository {
             it[VenuesTable.name] = name
             it[VenuesTable.address] = address
             it[VenuesTable.city] = city
+            it[VenuesTable.timezone] = timezone
         }
 
         VenueResponse(
@@ -31,6 +33,7 @@ class VenueRepository {
             name = name,
             address = address,
             city = city,
+            timezone = timezone,
         )
     }
 
@@ -89,5 +92,6 @@ class VenueRepository {
             name = row[VenuesTable.name],
             address = row[VenuesTable.address],
             city = row[VenuesTable.city],
+            timezone = row[VenuesTable.timezone],
         )
 }

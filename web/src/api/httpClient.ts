@@ -171,6 +171,21 @@ export async function apiRequest<T>(
     return await response.json() as T
 }
 
+export async function apiDownload(path: string, allowRefresh = true): Promise<Blob> {
+    const token = authStorage.get()
+    const response = await fetch(buildUrl(path), {
+        credentials: 'include',
+        headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+    })
+    if (response.status === 401 && allowRefresh && await refreshSession()) {
+        return apiDownload(path, false)
+    }
+    if (!response.ok) throw await parseError(response)
+    return response.blob()
+}
+
 export function json(
     body: unknown,
     method = 'POST',

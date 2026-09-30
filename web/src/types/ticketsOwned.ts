@@ -12,6 +12,9 @@ export interface IssuedTicketResponse {
   eventName?: string | null
   eventStartsAt?: string | null
   venueName?: string | null
+  venueAddress?: string | null
+  venueCity?: string | null
+  venueTimezone?: string | null
 
   inventoryId: string
 

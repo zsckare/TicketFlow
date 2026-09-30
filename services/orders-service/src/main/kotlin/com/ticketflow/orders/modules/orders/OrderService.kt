@@ -8,6 +8,7 @@ import com.ticketflow.orders.clients.tickets.TicketInventoryStatus
 import com.ticketflow.orders.clients.tickets.TicketsClient
 import com.ticketflow.orders.outbox.OrderConfirmedItem
 import java.time.OffsetDateTime
+import java.time.ZoneOffset
 import java.util.UUID
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
@@ -211,6 +212,37 @@ class OrderService(
     suspend fun findTickets(userId: UUID): List<IssuedTicketResponse> =
         repository.findTicketsByUser(userId).map { enrich(it) }
 
+    suspend fun ticketPdf(userId: UUID, ticketId: UUID, isAdmin: Boolean): ByteArray {
+        val raw = repository.findTicketById(ticketId) ?: throw OrderOperationException("Ticket not found")
+        if (!isAdmin && raw.userId != userId.toString()) throw SecurityException("Ticket does not belong to authenticated user")
+
+        val ticket = enrich(raw)
+        val order = repository.findById(UUID.fromString(ticket.orderId))
+            ?: throw OrderOperationException("Order for ticket was not found")
+        val orderItem = order.items.firstOrNull { it.inventoryId == ticket.inventoryId }
+
+        return TicketPdfService.render(
+            ticket = ticket,
+            unitPrice = orderItem?.unitPrice ?: order.amount,
+            currency = orderItem?.currency ?: order.currency,
+        )
+    }
+
+    /**
+     * Reconciles expired carts even when the customer never returns.
+     * Tickets Service releases inventory first; Orders then closes only rows
+     * that are still RESERVED, making the operation safe to repeat.
+     */
+    suspend fun expireReservations(): Int {
+        ticketsClient.releaseExpired()
+        val expired = repository.findExpiredReserved(OffsetDateTime.now(ZoneOffset.UTC))
+        var closed = 0
+        expired.forEach { order ->
+            if (repository.markCancelled(UUID.fromString(order.id)) != null) closed++
+        }
+        return closed
+    }
+
     fun checkInStats(eventId: UUID, isOperator: Boolean): CheckInStatsResponse {
         if (!isOperator) throw SecurityException("STAFF or ADMIN role required")
         return repository.ticketStats(eventId)
@@ -326,11 +358,15 @@ class OrderService(
             eventName = event?.name,
             eventStartsAt = event?.startsAt,
             venueName = venue?.name,
+            venueAddress = venue?.address,
+            venueCity = venue?.city,
+            venueTimezone = venue?.timezone,
             sectionName = section?.name,
             sectionType = section?.type,
             seatLabel = seat?.let { "${it.row}${it.number}" },
         )
     }
+
 
     private fun ensureOwner(order: OrderResponse, userId: UUID, isAdmin: Boolean) {
         if (!isAdmin && order.userId != userId.toString()) throw SecurityException("Order does not belong to authenticated user")

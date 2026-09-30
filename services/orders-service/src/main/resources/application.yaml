@@ -36,3 +36,6 @@ kafka:
 outbox:
   pollIntervalMs: "$OUTBOX_POLL_INTERVAL_MS:1000"
   batchSize: "$OUTBOX_BATCH_SIZE:50"
+
+reservations:
+  expirationPollIntervalMs: "$RESERVATION_EXPIRATION_POLL_INTERVAL_MS:15000"

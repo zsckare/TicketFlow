@@ -11,14 +11,17 @@ import io.ktor.server.application.call
 import io.ktor.server.routing.*
 import io.ktor.server.response.respondText
 import io.ktor.http.ContentType
-
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import io.ktor.server.application.log
 /**
  * Configures the HTTP routes exposed by Orders Service and wires all
  * dependencies required by the order domain.
  */
 fun Application.configureRouting() {
     val config = environment.config
-
+    val logger = log
     val ticketsClient = TicketsClient(
         httpClient = serviceHttpClient,
         baseUrl = config.property("services.tickets.baseUrl").getString(),
@@ -65,6 +68,20 @@ fun Application.configureRouting() {
         eventsClient = eventsClient,
         qrSecret = qrSecret,
     )
+
+    val expirationPollIntervalMs = config.propertyOrNull("reservations.expirationPollIntervalMs")
+        ?.getString()?.toLongOrNull() ?: 15_000L
+
+    launch {
+        while (isActive) {
+            try {
+                orderService.expireReservations()
+            } catch (cause: Exception) {
+                logger.error("Reservation expiration worker failed", cause)
+            }
+            delay(expirationPollIntervalMs)
+        }
+    }
 
     routing {
         get("/metrics") {

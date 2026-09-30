@@ -56,6 +56,8 @@ import {
     CheckoutSuccessPage,
 } from './pages/CheckoutSuccessPage'
 
+import { CheckoutCancelPage } from './pages/CheckoutCancelPage'
+
 import {
     DashboardPage,
 } from './pages/admin/DashboardPage'
@@ -173,6 +175,15 @@ export default function App() {
                     element={
                         <ProtectedRoute>
                             <CheckoutSuccessPage />
+                        </ProtectedRoute>
+                    }
+                />
+
+                <Route
+                    path="checkout/cancel"
+                    element={
+                        <ProtectedRoute>
+                            <CheckoutCancelPage />
                         </ProtectedRoute>
                     }
                 />

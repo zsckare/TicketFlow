@@ -1,12 +1,16 @@
 package com.ticketflow.orders.modules.orders
 
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
 import io.ktor.server.application.call
 import io.ktor.server.auth.authenticate
 import io.ktor.server.auth.jwt.JWTPrincipal
 import io.ktor.server.auth.principal
 import io.ktor.server.request.*
 import io.ktor.server.response.respond
+import io.ktor.server.response.respondBytes
+import io.ktor.server.response.header
 import io.ktor.server.routing.*
 import java.util.UUID
 import com.ticketflow.orders.SimpleRateLimiter
@@ -54,6 +58,19 @@ fun Route.orderRoutes(service: OrderService, internalSecret: String) {
             get("/tickets/me") {
                 val principal = call.principal<JWTPrincipal>()!!
                 call.respond(service.findTickets(UUID.fromString(principal.payload.subject)))
+            }
+
+            get("/tickets/{ticketId}/pdf") {
+                val principal = call.principal<JWTPrincipal>()!!
+                val ticketId = parseUuid(call.parameters["ticketId"])
+                    ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid ticketId"))
+                val bytes = service.ticketPdf(
+                    UUID.fromString(principal.payload.subject),
+                    ticketId,
+                    principal.isAdmin(),
+                )
+                call.response.header(HttpHeaders.ContentDisposition, "attachment; filename=TicketFlow-${ticketId}.pdf")
+                call.respondBytes(bytes, ContentType.Application.Pdf)
             }
 
             get("/tickets/check-in/stats/{eventId}") {

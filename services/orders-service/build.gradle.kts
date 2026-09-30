@@ -50,6 +50,11 @@ dependencies {
     implementation("io.ktor:ktor-server-auth-jwt")
     implementation("com.auth0:java-jwt:4.5.0")
     implementation("com.google.zxing:core:3.5.3")
+    // JasperReports renders printable TicketFlow tickets from JRXML templates.
+    implementation("net.sf.jasperreports:jasperreports:6.16.0")
+    implementation("com.lowagie:itext:2.1.7")
+    implementation("net.sf.jasperreports:jasperreports-fonts:6.16.0")
+    implementation("net.sf.jasperreports:jasperreports-functions:6.16.0")
 
     testImplementation(kotlin("test"))
     testImplementation(ktorLibs.server.testHost)

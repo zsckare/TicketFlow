@@ -144,6 +144,15 @@ class TicketsClient(
         }
     }
 
+    /** Releases every expired reservation in Tickets Service. */
+    suspend fun releaseExpired(): Int {
+        val response = httpClient.post("$baseUrl/inventory/release-expired")
+        if (response.status != HttpStatusCode.OK) {
+            error("Tickets Service returned ${response.status}")
+        }
+        return response.body<Map<String, Int>>()["released"] ?: 0
+    }
+
     suspend fun restock(inventoryId: String): TicketInventoryResponse? {
         val response = httpClient.post("$baseUrl/inventory/$inventoryId/restock")
         return when (response.status) {

@@ -11,6 +11,7 @@ data class VenueResponse(
     val name: String,
     val address: String,
     val city: String,
+    val timezone: String = "America/Monterrey",
 )
 
 /**
@@ -24,4 +25,5 @@ data class CreateVenueRequest(
     val name: String,
     val address: String,
     val city: String,
+    val timezone: String = "America/Monterrey",
 )

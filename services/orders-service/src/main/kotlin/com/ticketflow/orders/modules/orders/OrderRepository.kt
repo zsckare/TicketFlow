@@ -131,6 +131,10 @@ class OrderRepository {
         IssuedTicketsTable.selectAll().where { IssuedTicketsTable.userId eq userId }.orderBy(IssuedTicketsTable.issuedAt to SortOrder.DESC).map(::toTicket)
     }
 
+    fun findTicketById(ticketId: UUID): IssuedTicketResponse? = transaction {
+        IssuedTicketsTable.selectAll().where { IssuedTicketsTable.id eq ticketId }.singleOrNull()?.let(::toTicket)
+    }
+
     fun ticketStats(eventId: UUID): CheckInStatsResponse = transaction {
         val rows = IssuedTicketsTable.selectAll().where { IssuedTicketsTable.eventId eq eventId }.toList()
         val used = rows.count { it[IssuedTicketsTable.status] == IssuedTicketStatus.USED.name }
@@ -178,6 +182,17 @@ class OrderRepository {
     fun findById(id:UUID)=transaction{findByIdInternal(id)}
     fun findByUser(userId:UUID)=transaction{OrdersTable.selectAll().where{OrdersTable.userId eq userId}.orderBy(OrdersTable.createdAt to SortOrder.DESC).map(::toResponse)}
     fun findAll()=transaction{OrdersTable.selectAll().orderBy(OrdersTable.createdAt to SortOrder.DESC).map(::toResponse)}
+    fun findExpiredReserved(now: OffsetDateTime): List<OrderResponse> = transaction {
+        val expiredOrderIds = OrderItemsTable
+            .selectAll()
+            .where { OrderItemsTable.reservedUntil lessEq now }
+            .map { it[OrderItemsTable.orderId] }
+            .distinct()
+        if (expiredOrderIds.isEmpty()) emptyList()
+        else OrdersTable.selectAll()
+            .where { (OrdersTable.id inList expiredOrderIds) and (OrdersTable.status eq OrderStatus.RESERVED.name) }
+            .map(::toResponse)
+    }
     fun allTicketStatuses(): List<IssuedTicketStatus> = transaction { IssuedTicketsTable.selectAll().map { IssuedTicketStatus.valueOf(it[IssuedTicketsTable.status]) } }
     private fun findByIdInternal(id:UUID)=OrdersTable.selectAll().where{OrdersTable.id eq id}.singleOrNull()?.let(::toResponse)
     private fun items(orderId:UUID)=OrderItemsTable.selectAll().where{OrderItemsTable.orderId eq orderId}.map{row->OrderItemResponse(id=row[OrderItemsTable.id].toString(), inventoryId=row[OrderItemsTable.inventoryId].toString(), reservationId=row[OrderItemsTable.reservationId]?.toString(), reservedUntil=row[OrderItemsTable.reservedUntil]?.toString(), eventId=row[OrderItemsTable.eventId].toString(), sectionId=row[OrderItemsTable.sectionId]?.toString(), seatId=row[OrderItemsTable.seatId]?.toString(), unitPrice=row[OrderItemsTable.unitPrice].toPlainString(), currency=row[OrderItemsTable.currency])}

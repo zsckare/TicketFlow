@@ -14,7 +14,13 @@ data class EventResponse(
 )
 
 @Serializable
-data class VenueResponse(val id: String, val name: String, val address: String, val city: String)
+data class VenueResponse(
+    val id: String,
+    val name: String,
+    val address: String,
+    val city: String,
+    val timezone: String = "America/Monterrey",
+)
 
 @Serializable
 data class VenueSectionResponse(
