@@ -40,9 +40,10 @@ class OrderRepository {
         findByIdInternal(id)!!
     }
 
-    fun attachReservation(orderId: UUID, inventoryId: UUID, reservationId: UUID) = transaction {
+    fun attachReservation(orderId: UUID, inventoryId: UUID, reservationId: UUID, reservedUntil: OffsetDateTime?) = transaction {
         OrderItemsTable.update({ (OrderItemsTable.orderId eq orderId) and (OrderItemsTable.inventoryId eq inventoryId) }) {
             it[OrderItemsTable.reservationId] = reservationId
+            it[OrderItemsTable.reservedUntil] = reservedUntil
         }
     }
 
@@ -111,7 +112,19 @@ class OrderRepository {
     }
 
     private fun findTicketsByOrderInternal(orderId: UUID) = IssuedTicketsTable.selectAll().where { IssuedTicketsTable.orderId eq orderId }.map(::toTicket)
-    private fun toTicket(row: ResultRow) = IssuedTicketResponse(row[IssuedTicketsTable.id].toString(),row[IssuedTicketsTable.orderId].toString(),row[IssuedTicketsTable.userId].toString(),row[IssuedTicketsTable.eventId].toString(),row[IssuedTicketsTable.inventoryId].toString(),row[IssuedTicketsTable.sectionId]?.toString(),row[IssuedTicketsTable.seatId]?.toString(),row[IssuedTicketsTable.admissionToken].toString(),IssuedTicketStatus.valueOf(row[IssuedTicketsTable.status]),row[IssuedTicketsTable.issuedAt].toString(),row[IssuedTicketsTable.checkedInAt]?.toString())
+    private fun toTicket(row: ResultRow) = IssuedTicketResponse(
+        id = row[IssuedTicketsTable.id].toString(),
+        orderId = row[IssuedTicketsTable.orderId].toString(),
+        userId = row[IssuedTicketsTable.userId].toString(),
+        eventId = row[IssuedTicketsTable.eventId].toString(),
+        inventoryId = row[IssuedTicketsTable.inventoryId].toString(),
+        sectionId = row[IssuedTicketsTable.sectionId]?.toString(),
+        seatId = row[IssuedTicketsTable.seatId]?.toString(),
+        admissionToken = row[IssuedTicketsTable.admissionToken].toString(),
+        status = IssuedTicketStatus.valueOf(row[IssuedTicketsTable.status]),
+        issuedAt = row[IssuedTicketsTable.issuedAt].toString(),
+        checkedInAt = row[IssuedTicketsTable.checkedInAt]?.toString(),
+    )
 
     fun markCancelled(orderId: UUID): OrderResponse? = transaction {
         val updated=OrdersTable.update({ (OrdersTable.id eq orderId) and ((OrdersTable.status eq OrderStatus.RESERVED.name) or (OrdersTable.status eq OrderStatus.CONFIRMED.name)) }) {
@@ -123,6 +136,6 @@ class OrderRepository {
     fun findByUser(userId:UUID)=transaction{OrdersTable.selectAll().where{OrdersTable.userId eq userId}.orderBy(OrdersTable.createdAt to SortOrder.DESC).map(::toResponse)}
     fun findAll()=transaction{OrdersTable.selectAll().orderBy(OrdersTable.createdAt to SortOrder.DESC).map(::toResponse)}
     private fun findByIdInternal(id:UUID)=OrdersTable.selectAll().where{OrdersTable.id eq id}.singleOrNull()?.let(::toResponse)
-    private fun items(orderId:UUID)=OrderItemsTable.selectAll().where{OrderItemsTable.orderId eq orderId}.map{row->OrderItemResponse(row[OrderItemsTable.id].toString(),row[OrderItemsTable.inventoryId].toString(),row[OrderItemsTable.reservationId]?.toString(),row[OrderItemsTable.eventId].toString(),row[OrderItemsTable.sectionId]?.toString(),row[OrderItemsTable.seatId]?.toString(),row[OrderItemsTable.unitPrice].toPlainString(),row[OrderItemsTable.currency])}
-    private fun toResponse(row:ResultRow):OrderResponse{val its=items(row[OrdersTable.id]);return OrderResponse(row[OrdersTable.id].toString(),row[OrdersTable.userId]?.toString(),its.singleOrNull()?.inventoryId,its.singleOrNull()?.reservationId,row[OrdersTable.paymentId]?.toString(),row[OrdersTable.amount].toPlainString(),row[OrdersTable.currency],OrderStatus.valueOf(row[OrdersTable.status]),row[OrdersTable.failureReason],its,row[OrdersTable.createdAt].toString(),row[OrdersTable.updatedAt].toString())}
+    private fun items(orderId:UUID)=OrderItemsTable.selectAll().where{OrderItemsTable.orderId eq orderId}.map{row->OrderItemResponse(id=row[OrderItemsTable.id].toString(), inventoryId=row[OrderItemsTable.inventoryId].toString(), reservationId=row[OrderItemsTable.reservationId]?.toString(), reservedUntil=row[OrderItemsTable.reservedUntil]?.toString(), eventId=row[OrderItemsTable.eventId].toString(), sectionId=row[OrderItemsTable.sectionId]?.toString(), seatId=row[OrderItemsTable.seatId]?.toString(), unitPrice=row[OrderItemsTable.unitPrice].toPlainString(), currency=row[OrderItemsTable.currency])}
+    private fun toResponse(row:ResultRow):OrderResponse{val its=items(row[OrdersTable.id]);return OrderResponse(id=row[OrdersTable.id].toString(), userId=row[OrdersTable.userId]?.toString(), inventoryId=its.singleOrNull()?.inventoryId, reservationId=its.singleOrNull()?.reservationId, paymentId=row[OrdersTable.paymentId]?.toString(), amount=row[OrdersTable.amount].toPlainString(), currency=row[OrdersTable.currency], status=OrderStatus.valueOf(row[OrdersTable.status]), failureReason=row[OrdersTable.failureReason], items=its, reservedUntil=its.mapNotNull { it.reservedUntil }.minOrNull(), createdAt=row[OrdersTable.createdAt].toString(), updatedAt=row[OrdersTable.updatedAt].toString())}
 }

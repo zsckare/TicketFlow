@@ -8,6 +8,7 @@ object OrderItemsTable : Table("order_items") {
     val orderId = uuid("order_id").references(OrdersTable.id)
     val inventoryId = uuid("inventory_id")
     val reservationId = uuid("reservation_id").nullable()
+    val reservedUntil = timestampWithTimeZone("reserved_until").nullable()
     val eventId = uuid("event_id")
     val sectionId = uuid("section_id").nullable()
     val seatId = uuid("seat_id").nullable()

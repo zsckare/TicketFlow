@@ -2,12 +2,13 @@ package com.ticketflow.events.modules.events
 
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
 import java.time.OffsetDateTime
 import java.util.UUID
-
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 /**
  * Encapsula todo el acceso a PostgreSQL relacionado
  * con eventos.
@@ -118,6 +119,10 @@ class EventRepository {
             .limit(1)
             .map(::toResponse)
             .singleOrNull()
+    }
+
+    fun delete(id: UUID): Boolean = transaction {
+        EventsTable.deleteWhere { EventsTable.id eq id } > 0
     }
 
     /**

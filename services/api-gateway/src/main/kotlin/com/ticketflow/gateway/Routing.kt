@@ -67,6 +67,24 @@ fun Application.configureRouting() {
                     ?.removeSuffix("/publish")
                     ?.takeIf { it.isNotBlank() && !it.contains('/') }
 
+                val deleteEventId = requestPath
+                    .removePrefix("/api/events/")
+                    .takeIf {
+                        call.request.httpMethod == HttpMethod.Delete &&
+                            requestPath.startsWith("/api/events/") &&
+                            it.isNotBlank() && !it.contains('/')
+                    }
+
+                if (deleteEventId != null) {
+                    return@handle deleteEvent(
+                        call = call,
+                        client = client,
+                        eventId = deleteEventId,
+                        eventsBaseUrl = services.getValue("events"),
+                        ticketsBaseUrl = services.getValue("tickets"),
+                    )
+                }
+
                 if (publishEventId != null) {
                     return@handle publishEvent(
                         call = call,
@@ -244,6 +262,48 @@ private fun resolveTarget(
 
         else -> null
     }
+}
+
+/**
+ * Deletes a DRAFT event without leaving orphaned ticket inventory.
+ * Tickets refuses the purge when any unit is RESERVED or SOLD.
+ */
+private suspend fun deleteEvent(
+    call: ApplicationCall,
+    client: HttpClient,
+    eventId: String,
+    eventsBaseUrl: String,
+    ticketsBaseUrl: String,
+) {
+    // Validate the event first. Events Service enforces DRAFT again on final deletion.
+    val eventResponse = runCatching { client.get("${eventsBaseUrl.trimEnd('/')}/events/$eventId") }.getOrElse {
+        return call.respond(HttpStatusCode.BadGateway, mapOf("error" to "Events Service is unavailable"))
+    }
+    if (!eventResponse.status.isSuccess()) {
+        return call.respondBytes(eventResponse.readRawBytes(), eventResponse.contentType(), eventResponse.status)
+    }
+    val eventJson = runCatching { Json.parseToJsonElement(eventResponse.bodyAsText()).jsonObject }.getOrNull()
+    if (eventJson?.get("status")?.jsonPrimitive?.content != "DRAFT") {
+        return call.respond(HttpStatusCode.Conflict, mapOf("error" to "Only DRAFT events can be deleted. Cancel published events instead."))
+    }
+
+    val inventoryResponse = runCatching {
+        client.delete("${ticketsBaseUrl.trimEnd('/')}/inventory/events/$eventId")
+    }.getOrElse {
+        return call.respond(HttpStatusCode.BadGateway, mapOf("error" to "Tickets Service is unavailable"))
+    }
+    if (!inventoryResponse.status.isSuccess()) {
+        return call.respondBytes(inventoryResponse.readRawBytes(), inventoryResponse.contentType(), inventoryResponse.status)
+    }
+
+    val deleteResponse = runCatching {
+        client.delete("${eventsBaseUrl.trimEnd('/')}/events/$eventId") {
+            call.request.headers[HttpHeaders.Authorization]?.let { header(HttpHeaders.Authorization, it) }
+        }
+    }.getOrElse {
+        return call.respond(HttpStatusCode.BadGateway, mapOf("error" to "Events Service is unavailable"))
+    }
+    call.respondBytes(deleteResponse.readRawBytes(), deleteResponse.contentType(), deleteResponse.status)
 }
 
 /**

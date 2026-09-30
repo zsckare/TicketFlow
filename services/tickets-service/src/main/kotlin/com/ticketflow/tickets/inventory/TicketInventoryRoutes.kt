@@ -5,6 +5,7 @@ import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
+import io.ktor.server.routing.delete
 import io.ktor.server.routing.post
 import io.ktor.server.routing.put
 import java.util.UUID
@@ -79,6 +80,14 @@ fun Route.ticketInventoryRoutes(
             )
 
         call.respond(service.getReadiness(eventId))
+    }
+
+    /** Removes all AVAILABLE inventory/configuration for a DRAFT event before deleting it. */
+    delete("/inventory/events/{eventId}") {
+        val eventId = parseUuid(call.parameters["eventId"])
+            ?: return@delete call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid event ID"))
+        val deleted = service.deleteEventInventory(eventId)
+        call.respond(HttpStatusCode.OK, mapOf("deletedInventory" to deleted))
     }
 
     /** Returns the commercial configuration for every configured section. */

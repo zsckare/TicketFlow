@@ -5,6 +5,7 @@ import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
+import io.ktor.server.routing.delete
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import java.util.UUID
@@ -87,6 +88,13 @@ fun Route.eventRoutes(
             }
 
             call.respond(event)
+        }
+
+        delete("/{eventId}") {
+            val eventId = call.parameters["eventId"]?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+                ?: return@delete call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid event ID"))
+            service.delete(eventId)
+            call.respond(HttpStatusCode.NoContent)
         }
 
         /**

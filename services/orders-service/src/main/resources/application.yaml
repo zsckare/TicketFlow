@@ -18,6 +18,8 @@ services:
     baseUrl: "$TICKETS_SERVICE_URL:http://localhost:8082"
   payments:
     baseUrl: "$PAYMENTS_SERVICE_URL:http://localhost:8085"
+  events:
+    baseUrl: "$EVENTS_SERVICE_URL:http://localhost:8081"
 
 jwt:
   secret: "$JWT_SECRET:ticketflow-dev-secret-change-me"

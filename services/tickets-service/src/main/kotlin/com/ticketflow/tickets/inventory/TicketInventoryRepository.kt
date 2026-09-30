@@ -147,6 +147,16 @@ if (excess > 0) {
         EventSectionInventoryResponse(eventId.toString(), sectionId.toString(), type, basePrice.toPlainString(), currency, capacity)
     }
 
+    fun deleteEventInventory(eventId: UUID): Int = transaction {
+        val inventory = TicketInventoryTable.selectAll().where { TicketInventoryTable.eventId eq eventId }.toList()
+        require(inventory.all { it[TicketInventoryTable.status] == TicketInventoryStatus.AVAILABLE.name }) {
+            "Event inventory has reserved or sold tickets"
+        }
+        val deleted = TicketInventoryTable.deleteWhere { TicketInventoryTable.eventId eq eventId }
+        EventSectionInventoryTable.deleteWhere { EventSectionInventoryTable.eventId eq eventId }
+        deleted
+    }
+
     fun findSectionConfigs(eventId: UUID): List<EventSectionInventoryResponse> = transaction {
         EventSectionInventoryTable.selectAll().where { EventSectionInventoryTable.eventId eq eventId }.map {
             EventSectionInventoryResponse(

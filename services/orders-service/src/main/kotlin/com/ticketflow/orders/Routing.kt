@@ -1,6 +1,7 @@
 package com.ticketflow.orders
 
 import com.ticketflow.orders.clients.payments.PaymentsClient
+import com.ticketflow.orders.clients.events.EventsClient
 import com.ticketflow.orders.clients.tickets.TicketsClient
 import com.ticketflow.orders.modules.orders.OrderRepository
 import com.ticketflow.orders.modules.orders.OrderService
@@ -21,10 +22,16 @@ fun Application.configureRouting() {
         baseUrl = config.property("services.payments.baseUrl").getString(),
     )
 
+    val eventsClient = EventsClient(
+        httpClient = serviceHttpClient,
+        baseUrl = config.property("services.events.baseUrl").getString(),
+    )
+
     val orderService = OrderService(
         repository = OrderRepository(),
         ticketsClient = ticketsClient,
         paymentsClient = paymentsClient,
+        eventsClient = eventsClient,
     )
 
     routing {

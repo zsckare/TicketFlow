@@ -168,6 +168,7 @@ services:
       DB_PASSWORD: ticketflow
       TICKETS_SERVICE_URL: http://tickets-service:8082
       PAYMENTS_SERVICE_URL: http://payments-service:8085
+      EVENTS_SERVICE_URL: http://events-service:8081
       JWT_SECRET: ticketflow-dev-secret-change-me
       JWT_ISSUER: ticketflow-users
       JWT_AUDIENCE: ticketflow-api
@@ -180,6 +181,8 @@ services:
       tickets-service:
         condition: service_started
       payments-service:
+        condition: service_started
+      events-service:
         condition: service_started
       kafka:
         condition: service_started

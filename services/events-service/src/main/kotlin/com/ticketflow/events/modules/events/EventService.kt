@@ -138,6 +138,12 @@ class EventService(
         ) ?: error("Event does not exist")
     }
 
+    fun delete(id: UUID) {
+        val event = eventRepository.findById(id) ?: error("Event does not exist")
+        require(event.status == EventStatus.DRAFT) { "Only DRAFT events can be deleted" }
+        check(eventRepository.delete(id)) { "Event could not be deleted" }
+    }
+
     /**
      * Convierte un String en UUID y proporciona un error
      * de dominio más comprensible.

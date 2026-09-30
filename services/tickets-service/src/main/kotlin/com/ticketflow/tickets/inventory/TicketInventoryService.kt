@@ -403,6 +403,8 @@ class TicketInventoryService(
         )
     }
 
+    fun deleteEventInventory(eventId: UUID): Int = repository.deleteEventInventory(eventId)
+
     fun findSectionConfigs(eventId: UUID): List<EventSectionInventoryResponse> =
         repository.findSectionConfigs(eventId)
 

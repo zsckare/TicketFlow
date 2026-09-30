@@ -30,18 +30,20 @@ export function EventDetailPage() {
   const activeSectionData = sections.data?.find(section => section.id === activeSection)
   const seats = useQuery({ queryKey: ['seats', activeSection], queryFn: () => eventsApi.getSeats(activeSection!), enabled: !!activeSection && activeSectionData?.type === 'RESERVED_SEATING' })
   const inventory = useQuery({ queryKey: ['inventory', eventId], queryFn: () => ticketsApi.getEventInventory(eventId) })
+  const activeOrder = useQuery({ queryKey: ['active-order', eventId, user?.id], queryFn: () => ordersApi.getActiveForEvent(eventId), enabled: !!user && !!eventId })
+  const currentOrder = order ?? activeOrder.data ?? undefined
 
   const refreshInventory = () => qc.invalidateQueries({ queryKey: ['inventory', eventId] })
-  const create = useMutation({ mutationFn: ordersApi.create, onSuccess: response => { setOrder(response); void refreshInventory() } })
-  const confirm = useMutation({ mutationFn: ordersApi.confirm, onSuccess: response => { setOrder(response); setSelected([]); void refreshInventory() } })
-  const cancel = useMutation({ mutationFn: ordersApi.cancel, onSuccess: response => { setOrder(response); setSelected([]); void refreshInventory() } })
+  const create = useMutation({ mutationFn: ordersApi.create, onSuccess: response => { setOrder(response); setSelected([]); void qc.invalidateQueries({ queryKey: ['active-order'] }); void refreshInventory() } })
+  const confirm = useMutation({ mutationFn: ordersApi.confirm, onSuccess: response => { setOrder(response); setSelected([]); void qc.invalidateQueries({ queryKey: ['active-order'] }); void refreshInventory() } })
+  const cancel = useMutation({ mutationFn: ordersApi.cancel, onSuccess: response => { setOrder(response); setSelected([]); void qc.invalidateQueries({ queryKey: ['active-order'] }); void refreshInventory() } })
 
   const inventoryBySeat = useMemo(() => new Map((inventory.data ?? []).filter(item => item.seatId).map(item => [item.seatId!, item])), [inventory.data])
   const generalAvailable = useMemo(() => (inventory.data ?? []).filter(item => item.sectionId === activeSection && !item.seatId && item.status === 'AVAILABLE'), [inventory.data, activeSection])
   const selectedIds = useMemo(() => new Set(selected.map(item => item.inventory.id)), [selected])
   const selectedGeneral = selected.filter(item => item.inventory.sectionId === activeSection && item.sectionType === 'GENERAL_ADMISSION')
   const busy = create.isPending || confirm.isPending || cancel.isPending
-  const hasActiveOrder = order?.status === 'PENDING' || order?.status === 'RESERVED'
+  const hasActiveOrder = currentOrder?.status === 'PENDING' || currentOrder?.status === 'RESERVED'
   const isReservedSection = activeSectionData?.type === 'RESERVED_SEATING'
   const isSelectionLoading = inventory.isPending || (isReservedSection && seats.isPending)
 
@@ -85,10 +87,10 @@ export function EventDetailPage() {
       </section>
 
       <div>
-        <BookingCart selections={selected} order={order} busy={busy} onRemove={removeSelection} onContinue={() => {
+        <BookingCart selections={selected} order={currentOrder} busy={busy} onRemove={removeSelection} onContinue={() => {
           if (!user) { navigate('/login', { state: { from: location.pathname } }); return }
           create.mutate(selected.map(item => item.inventory.id))
-        }} onConfirm={() => order && confirm.mutate(order.id)} onCancel={() => order && cancel.mutate(order.id)} />
+        }} onConfirm={() => currentOrder && confirm.mutate(currentOrder.id)} onCancel={() => currentOrder && cancel.mutate(currentOrder.id)} />
         {(create.error || confirm.error || cancel.error) && <ErrorState error={(create.error || confirm.error || cancel.error)!} />}
       </div>
     </div>

@@ -5,7 +5,7 @@ import io.ktor.server.application.call
 import io.ktor.server.auth.authenticate
 import io.ktor.server.auth.jwt.JWTPrincipal
 import io.ktor.server.auth.principal
-import io.ktor.server.request.receive
+import io.ktor.server.request.*
 import io.ktor.server.response.respond
 import io.ktor.server.routing.*
 import java.util.UUID
@@ -24,6 +24,21 @@ fun Route.orderRoutes(service: OrderService) {
                 val principal = call.principal<JWTPrincipal>()!!
                 val userId = UUID.fromString(principal.payload.subject)
                 call.respond(service.findForUser(userId, principal.isAdmin()))
+            }
+
+            get("/active") {
+                val principal = call.principal<JWTPrincipal>()!!
+                val userId = UUID.fromString(principal.payload.subject)
+                val eventIdValue = call.request.queryParameters["eventId"]
+                val active = if (eventIdValue.isNullOrBlank()) {
+                    service.findActive(userId)
+                } else {
+                    val eventId = parseUuid(eventIdValue)
+                        ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid eventId"))
+                    service.findActiveForEvent(userId, eventId)
+                }
+                if (active == null) call.respond(HttpStatusCode.NotFound, mapOf("error" to "No active reservation"))
+                else call.respond(active)
             }
 
             get("/tickets/me") {
