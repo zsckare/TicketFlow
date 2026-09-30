@@ -17,3 +17,5 @@ jwt:
   issuer: "$JWT_ISSUER:ticketflow-users"
   audience: "$JWT_AUDIENCE:ticketflow-api"
   expiresMinutes: "$JWT_EXPIRES_MINUTES:60"
+  refreshExpiresDays: "$JWT_REFRESH_EXPIRES_DAYS:30"
+  refreshCookieSecure: "$JWT_REFRESH_COOKIE_SECURE:true"

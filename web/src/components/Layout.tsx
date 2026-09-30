@@ -17,7 +17,7 @@ export function Layout() {
         {user && <NavLink to="/tickets">Boletos</NavLink>}
         {user && <NavLink to="/notifications">Notificaciones</NavLink>}
         {user?.role === 'ADMIN' && <NavLink to="/admin">Administrar</NavLink>}
-        {!user ? <NavLink className="nav-cta" to="/login">Iniciar sesión</NavLink> : <button className="nav-button" onClick={() => { logout(); navigate('/events') }}>Salir <span>· {user.firstName ?? user.email}</span></button>}
+        {!user ? <NavLink className="nav-cta" to="/login">Iniciar sesión</NavLink> : <button className="nav-button" onClick={async () => { await logout(); navigate('/events') }}>Salir <span>· {user.firstName ?? user.email}</span></button>}
       </nav>
     </header>
     <Outlet />
