@@ -1,241 +1,29 @@
-
-import {
-    useMutation,
-    useQuery,
-    useQueryClient,
-} from '@tanstack/react-query'
-
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ordersApi } from '../api/ordersApi'
-import {
-    Badge,
-    Empty,
-    ErrorState,
-    Loading,
-} from '../components/Ui'
-import {
-    formatDate,
-    formatMoney,
-} from '../lib/format'
+import { Badge, Empty, ErrorState, Loading } from '../components/Ui'
+import { formatDate, formatMoney } from '../lib/format'
 
 export function MyOrdersPage() {
-    const queryClient = useQueryClient()
-
-    /*
-     * ID de la orden sobre la que se está ejecutando
-     * actualmente una acción.
-     *
-     * Lo usamos para deshabilitar únicamente los botones
-     * de esa orden mientras se procesa la petición.
-     */
-    const confirmMutation = useMutation({
-        mutationFn: (orderId: string) =>
-            ordersApi.confirm(orderId),
-
-        onSuccess: async () => {
-            /*
-             * Volvemos a consultar las órdenes para obtener
-             * el nuevo estado desde el backend.
-             */
-            await queryClient.invalidateQueries({
-                queryKey: ['my-orders'],
-            })
-
-            /*
-             * Una confirmación puede cambiar inventario de
-             * RESERVED -> SOLD.
-             *
-             * Invalidamos cualquier consulta de inventory,
-             * independientemente del eventId.
-             */
-            await queryClient.invalidateQueries({
-                queryKey: ['inventory'],
-            })
-        },
-    })
-
-    const cancelMutation = useMutation({
-        mutationFn: (orderId: string) =>
-            ordersApi.cancel(orderId),
-
-        onSuccess: async () => {
-            /*
-             * Al cancelar esperamos que Orders libere las
-             * reservaciones correspondientes en Tickets.
-             */
-            await queryClient.invalidateQueries({
-                queryKey: ['my-orders'],
-            })
-
-            /*
-             * Esto hará que la próxima vez que entremos al
-             * evento se consulte nuevamente el inventario y
-             * los asientos liberados aparezcan AVAILABLE.
-             */
-            await queryClient.invalidateQueries({
-                queryKey: ['inventory'],
-            })
-        },
-    })
-
-    const ordersQuery = useQuery({
-        queryKey: ['my-orders'],
-        queryFn: ordersApi.getAll,
-    })
-
-    if (ordersQuery.isPending) {
-        return <Loading />
-    }
-
-    if (ordersQuery.isError) {
-        return (
-            <ErrorState
-                error={ordersQuery.error}
-            />
-        )
-    }
-
-    const actionError =
-        confirmMutation.error ??
-        cancelMutation.error
-
-    return (
-        <main className="page">
-            <div className="section-title">
-                <h1>Mis órdenes</h1>
-
-                <span>
-                    {ordersQuery.data.length}
-                </span>
-            </div>
-
-            {actionError && (
-                <ErrorState
-                    error={actionError}
-                />
-            )}
-
-            {!ordersQuery.data.length ? (
-                <Empty>
-                    Aún no tienes órdenes.
-                </Empty>
-            ) : (
-                <div className="order-cards">
-                    {ordersQuery.data.map(order => {
-                        const isReserved =
-                            order.status === 'RESERVED'
-
-                        const isConfirming =
-                            confirmMutation.isPending &&
-                            confirmMutation.variables ===
-                            order.id
-
-                        const isCancelling =
-                            cancelMutation.isPending &&
-                            cancelMutation.variables ===
-                            order.id
-
-                        const isProcessing =
-                            isConfirming ||
-                            isCancelling
-
-                        return (
-                            <article
-                                className="panel order-card"
-                                key={order.id}
-                            >
-                                <div>
-                                    <small>
-                                        ORDEN
-                                    </small>
-
-                                    <code>
-                                        {order.id}
-                                    </code>
-                                </div>
-
-                                <b>
-                                    {formatMoney(
-                                        order.amount,
-                                        order.currency,
-                                    )}
-                                </b>
-
-                                <Badge
-                                    tone={order.status.toLowerCase()}
-                                >
-                                    {order.status}
-                                </Badge>
-
-                                <span className="muted">
-                                    {formatDate(
-                                        order.createdAt,
-                                    )}
-                                </span>
-
-                                {isReserved && (
-                                    <div className="stack">
-                                        <button
-                                            type="button"
-                                            className="button primary full"
-                                            disabled={
-                                                isProcessing
-                                            }
-                                            onClick={() =>
-                                                confirmMutation.mutate(
-                                                    order.id,
-                                                )
-                                            }
-                                        >
-                                            {isConfirming
-                                                ? 'Confirmando...'
-                                                : 'Confirmar compra'}
-                                        </button>
-
-                                        <button
-                                            type="button"
-                                            className="button secondary full"
-                                            disabled={
-                                                isProcessing
-                                            }
-                                            onClick={() =>
-                                                cancelMutation.mutate(
-                                                    order.id,
-                                                )
-                                            }
-                                        >
-                                            {isCancelling
-                                                ? 'Cancelando...'
-                                                : 'Cancelar reservación'}
-                                        </button>
-                                    </div>
-                                )}
-
-                                {order.status ===
-                                    'CONFIRMED' && (
-                                        <div className="alert success">
-                                            Compra confirmada.
-                                        </div>
-                                    )}
-
-                                {order.status ===
-                                    'CANCELLED' && (
-                                        <div className="alert info">
-                                            Reservación cancelada.
-                                        </div>
-                                    )}
-
-                                {order.status ===
-                                    'FAILED' && (
-                                        <div className="alert info">
-                                            La orden no pudo
-                                            completarse.
-                                        </div>
-                                    )}
-                            </article>
-                        )
-                    })}
-                </div>
-            )}
-        </main>
-    )
+  const qc = useQueryClient()
+  const q = useQuery({ queryKey: ['my-orders'], queryFn: ordersApi.getAll })
+  const refresh = async () => { await qc.invalidateQueries({ queryKey: ['my-orders'] }); await qc.invalidateQueries({ queryKey: ['inventory'] }) }
+  const confirm = useMutation({ mutationFn: ordersApi.confirm, onSuccess: refresh })
+  const cancel = useMutation({ mutationFn: ordersApi.cancel, onSuccess: refresh })
+  if (q.isPending) return <Loading />
+  if (q.isError) return <ErrorState error={q.error} />
+  const error = confirm.error ?? cancel.error
+  return <main className="page account-page">
+    <div className="page-heading"><div><span className="eyebrow">Tu cuenta</span><h1>Mis órdenes</h1><p>Consulta tus compras y continúa cualquier reservación pendiente.</p></div><span className="count-label">{q.data.length} órdenes</span></div>
+    {error && <ErrorState error={error} />}
+    {!q.data.length ? <Empty>Aún no has realizado ninguna compra.</Empty> : <div className="order-cards">{q.data.map(order => {
+      const processing = (confirm.isPending && confirm.variables === order.id) || (cancel.isPending && cancel.variables === order.id)
+      return <article className="panel order-card" key={order.id}>
+        <div className="order-main"><div className="order-title"><div><small>ORDEN</small><code>#{order.id.slice(0, 8).toUpperCase()}</code></div><Badge tone={order.status.toLowerCase()}>{order.status}</Badge></div><div className="order-meta"><span>{order.items?.length ?? 1} {(order.items?.length ?? 1) === 1 ? 'boleto' : 'boletos'}</span><span>Creada {formatDate(order.createdAt)}</span></div></div>
+        <div className="order-amount"><small>TOTAL</small><strong>{formatMoney(order.amount, order.currency)}</strong></div>
+        {order.status === 'RESERVED' && <div className="order-actions"><button className="button primary" disabled={processing} onClick={() => confirm.mutate(order.id)}>Confirmar compra</button><button className="button secondary" disabled={processing} onClick={() => cancel.mutate(order.id)}>Cancelar</button></div>}
+        {order.status === 'CONFIRMED' && <div className="order-note success-text">✓ Compra completada</div>}
+        {order.status === 'CANCELLED' && <div className="order-note muted">Reservación cancelada</div>}
+      </article>
+    })}</div>}
+  </main>
 }
