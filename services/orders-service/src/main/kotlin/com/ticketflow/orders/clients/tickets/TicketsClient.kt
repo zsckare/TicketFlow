@@ -161,4 +161,6 @@ class TicketsClient(
             else -> error("Tickets Service returned ${response.status}")
         }
     }
+    suspend fun findByEvent(eventId:String):List<TicketInventoryResponse>{val response=httpClient.get("$baseUrl/events/$eventId/inventory");if(response.status!=HttpStatusCode.OK)error("Tickets Service returned ${response.status}");return response.body()}
+
 }

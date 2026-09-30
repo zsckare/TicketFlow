@@ -97,6 +97,19 @@ fun Route.ticketInventoryRoutes(
         call.respond(service.findSectionConfigs(eventId))
     }
 
+    post("/inventory/events/{eventId}/pricing-tiers") {
+        val eventId=parseUuid(call.parameters["eventId"]) ?: return@post call.respond(HttpStatusCode.BadRequest)
+        call.respond(HttpStatusCode.Created,service.createPricingTier(eventId,call.receive<CreatePricingTierRequest>()))
+    }
+    get("/inventory/events/{eventId}/pricing-tiers") {
+        val eventId=parseUuid(call.parameters["eventId"]) ?: return@get call.respond(HttpStatusCode.BadRequest)
+        call.respond(service.findPricingTiers(eventId))
+    }
+    delete("/inventory/pricing-tiers/{tierId}") {
+        val id=parseUuid(call.parameters["tierId"]) ?: return@delete call.respond(HttpStatusCode.BadRequest)
+        call.respond(mapOf("deleted" to service.deletePricingTier(id)))
+    }
+
     /** Adds, changes or removes an individual seat price override. */
     put("/inventory/events/{eventId}/seats/{seatId}/price") {
         val eventId = call.parameters["eventId"] ?: return@put call.respond(HttpStatusCode.BadRequest)

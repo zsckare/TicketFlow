@@ -34,6 +34,12 @@ object VenueSectionsTable : Table("venue_sections") {
     val capacity =
         integer("capacity")
 
+    val mapX = decimal("map_x",10,2).nullable()
+    val mapY = decimal("map_y",10,2).nullable()
+    val mapWidth = decimal("map_width",10,2).nullable()
+    val mapHeight = decimal("map_height",10,2).nullable()
+    val mapRotation = decimal("map_rotation",10,2)
+
     val createdAt =
         timestampWithTimeZone("created_at")
 

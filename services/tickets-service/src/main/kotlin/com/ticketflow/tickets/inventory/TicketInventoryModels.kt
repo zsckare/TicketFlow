@@ -75,3 +75,6 @@ data class ReleaseTicketRequest(val reservationId: String)
 
 @Serializable
 data class ConfirmTicketRequest(val reservationId: String)
+
+@Serializable data class CreatePricingTierRequest(val sectionId:String,val name:String,val price:String,val currency:String,val salesStartAt:String?=null,val salesEndAt:String?=null,val priority:Int=0,val active:Boolean=true)
+@Serializable data class PricingTierResponse(val id:String,val eventId:String,val sectionId:String,val name:String,val price:String,val currency:String,val salesStartAt:String?=null,val salesEndAt:String?=null,val priority:Int,val active:Boolean)

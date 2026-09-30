@@ -31,6 +31,9 @@ object SeatsTable : Table("seats") {
             length = 20,
         )
 
+    val mapX = decimal("map_x",10,2).nullable()
+    val mapY = decimal("map_y",10,2).nullable()
+
     val createdAt =
         timestampWithTimeZone("created_at")
 

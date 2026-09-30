@@ -3,6 +3,7 @@ package com.ticketflow.events.modules.seats
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
+import org.jetbrains.exposed.sql.update
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.util.UUID
 
@@ -90,7 +91,9 @@ class SeatRepository {
             row =
                 row[SeatsTable.rowName],
 
-            number =
-                row[SeatsTable.seatNumber],
+            number = row[SeatsTable.seatNumber],
+            mapX=row[SeatsTable.mapX]?.toDouble(), mapY=row[SeatsTable.mapY]?.toDouble(),
         )
+    fun updateMap(id:UUID,r:UpdateSeatMapRequest):SeatResponse?=transaction{val updated=SeatsTable.update({SeatsTable.id eq id}){it[mapX]=r.x?.toBigDecimal();it[mapY]=r.y?.toBigDecimal()};if(updated==0)null else SeatsTable.selectAll().where{SeatsTable.id eq id}.single().let(::toResponse)}
+
 }

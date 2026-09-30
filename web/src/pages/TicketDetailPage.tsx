@@ -1,14 +1,17 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import { myTicketsApi } from '../api/myTicketsApi'
 import { Badge, ErrorState, Loading } from '../components/Ui'
 import { formatDateInTimeZone } from '../lib/format'
+import { commerceApi } from '../api/commerceApi'
 
 export function TicketDetailPage() {
   const { ticketId } = useParams()
   const [downloading, setDownloading] = useState(false)
   const [downloadError, setDownloadError] = useState<unknown>(null)
+  const [recipientEmail,setRecipientEmail]=useState('')
+  const qc=useQueryClient()
   const q = useQuery({
     queryKey: ['ticket', ticketId],
     queryFn: () => myTicketsApi.get(ticketId!),
@@ -20,6 +23,9 @@ export function TicketDetailPage() {
   if (q.isError) return <ErrorState error={q.error} />
 
   const ticket = q.data
+  const transfer=useMutation({mutationFn:()=>commerceApi.transferTicket(ticket.id,recipientEmail),onSuccess:async()=>{setRecipientEmail('');await qc.invalidateQueries({queryKey:['my-tickets']})}})
+  const refund=useMutation({mutationFn:()=>commerceApi.refundTicket(ticket.orderId,ticket.id,'Customer requested ticket refund'),onSuccess:async()=>{await qc.invalidateQueries({queryKey:['ticket',ticket.id]});await qc.invalidateQueries({queryKey:['my-tickets']})}})
+
   const download = async () => {
     setDownloading(true)
     setDownloadError(null)
@@ -52,6 +58,7 @@ export function TicketDetailPage() {
         {ticket.status === 'CANCELLED' && <div className="alert info"><b>Boleto cancelado</b><span>Este boleto se conserva como historial, pero ya no permite acceso.</span></div>}
 
         <div className="ticket-audit"><span><small>BOLETO</small><code>#{ticket.id.slice(0, 8).toUpperCase()}</code></span><span><small>EMITIDO</small><b>{formatDateInTimeZone(ticket.issuedAt, ticket.venueTimezone)}</b></span></div>
+        {ticket.status === 'ISSUED' && <div className="panel"><h3>Administrar boleto</h3><div className="form-grid"><input type="email" placeholder="Email del destinatario" value={recipientEmail} onChange={e=>setRecipientEmail(e.target.value)}/><button className="button secondary" disabled={!recipientEmail||transfer.isPending} onClick={()=>transfer.mutate()}>Transferir boleto</button><button className="button secondary" disabled={refund.isPending} onClick={()=>{if(window.confirm('¿Reembolsar y cancelar únicamente este boleto?'))refund.mutate()}}>Reembolsar este boleto</button></div>{transfer.isSuccess&&<div className="alert success">Transferencia creada. El destinatario puede aceptarla con su cuenta.</div>}{(transfer.error||refund.error) instanceof Error&&<ErrorState error={(transfer.error||refund.error) as Error}/>}</div>}
         <div className="inline-actions"><button className="button primary" disabled={downloading} onClick={() => void download()}>{downloading ? 'Generando PDF…' : 'Descargar PDF'}</button><Link className="button secondary" to="/tickets">Volver a mis boletos</Link></div>
       </div>
     </section>

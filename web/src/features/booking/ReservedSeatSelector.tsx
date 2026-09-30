@@ -17,7 +17,7 @@ export function ReservedSeatSelector({ seats, inventoryBySeat, selectedIds, disa
       <span><i className="legend-dot selected-dot" />Seleccionado</span>
       <span><i className="legend-dot unavailable-dot" />No disponible</span>
     </div>
-    <div className="seat-grid">
+    <div className={`seat-grid ${seats.some(s=>s.mapX != null && s.mapY != null) ? 'seat-grid-mapped' : ''}`}>
       {seats.map(seat => {
         const inventory = inventoryBySeat.get(seat.id)
         const available = inventory?.status === 'AVAILABLE'
@@ -25,6 +25,7 @@ export function ReservedSeatSelector({ seats, inventoryBySeat, selectedIds, disa
         return <button
           type="button"
           key={seat.id}
+          style={seat.mapX != null && seat.mapY != null ? { left: `${seat.mapX}%`, top: `${seat.mapY}%` } : undefined}
           className={`seat ${available ? 'available' : 'unavailable'} ${selected ? 'selected' : ''}`}
           disabled={!available || disabled}
           aria-pressed={selected}

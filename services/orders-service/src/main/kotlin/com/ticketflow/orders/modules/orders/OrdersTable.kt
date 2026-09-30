@@ -47,6 +47,10 @@ object OrdersTable : Table("orders") {
             length = 500,
         ).nullable()
 
+    val discountAmount = decimal("discount_amount", 12, 2)
+
+    val promotionCode = varchar("promotion_code", 64).nullable()
+
     val createdAt =
         timestampWithTimeZone("created_at")
 

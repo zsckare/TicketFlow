@@ -5,5 +5,5 @@ import io.ktor.client.request.*
 import io.ktor.http.*
 class PaymentsClient(private val httpClient:HttpClient,private val baseUrl:String,private val internalSecret:String){
  suspend fun createCheckout(request:CreateCheckoutRequest):PaymentResponse{val r=httpClient.post("$baseUrl/checkout"){header("X-Internal-Service-Secret",internalSecret);contentType(ContentType.Application.Json);setBody(request)};if(r.status!=HttpStatusCode.Created&&r.status!=HttpStatusCode.OK)error("Payments Service returned ${r.status}");return r.body()}
- suspend fun refund(paymentId:String):PaymentResponse{val r=httpClient.post("$baseUrl/payments/$paymentId/refund"){header("X-Internal-Service-Secret",internalSecret);contentType(ContentType.Application.Json);setBody(mapOf("reason" to "Order cancelled"))};if(r.status!=HttpStatusCode.OK)error("Payments Service returned ${r.status}");return r.body()}
+ suspend fun refund(paymentId:String, amount:String?=null, reason:String="Order cancelled", idempotencyKey:String?=null):PaymentResponse{val r=httpClient.post("$baseUrl/payments/$paymentId/refund"){header("X-Internal-Service-Secret",internalSecret);contentType(ContentType.Application.Json);setBody(RefundPaymentRequest(reason,amount,idempotencyKey))};if(r.status!=HttpStatusCode.OK)error("Payments Service returned ${r.status}");return r.body()}
 }

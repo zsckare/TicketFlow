@@ -87,4 +87,6 @@ class SeatService(
         id: UUID,
     ): SeatResponse? =
         repository.findById(id)
+    fun updateMap(id:UUID,request:UpdateSeatMapRequest)=repository.updateMap(id,request)
+
 }

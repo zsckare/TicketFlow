@@ -1,11 +1,15 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { myTicketsApi } from '../api/myTicketsApi'
 import { Badge, Empty, ErrorState, Loading } from '../components/Ui'
 import { formatDateInTimeZone } from '../lib/format'
+import { commerceApi } from '../api/commerceApi'
 
 export function MyTicketsPage() {
+  const qc=useQueryClient()
+  const transfers=useQuery({queryKey:['ticket-transfers'],queryFn:commerceApi.transfers})
+  const accept=useMutation({mutationFn:commerceApi.acceptTransfer,onSuccess:async()=>{await Promise.all([qc.invalidateQueries({queryKey:['ticket-transfers']}),qc.invalidateQueries({queryKey:['my-tickets']})])}})
   const q = useQuery({ queryKey: ['my-tickets'], queryFn: myTicketsApi.getMine })
   const [downloading, setDownloading] = useState<string | null>(null)
   const [downloadError, setDownloadError] = useState<unknown>(null)
@@ -17,6 +21,7 @@ export function MyTicketsPage() {
     {downloadError instanceof Error && (
       <ErrorState error={downloadError} />
     )}
+    {transfers.data?.some(t=>t.status==='PENDING') && <section className="panel"><h2>Transferencias pendientes</h2>{transfers.data.filter(t=>t.status==='PENDING').map(t=><div className="list-row" key={t.id}><span><b>Boleto #{t.ticketId.slice(0,8).toUpperCase()}</b><small>Enviado a {t.recipientEmail}</small></span><button className="button primary" onClick={()=>accept.mutate(t.transferToken)}>Aceptar</button></div>)}</section>}
     {!q.data.length ? <Empty>Todavía no tienes boletos emitidos.</Empty> : <div className="ticket-grid">{q.data.map(ticket => <article className={`digital-ticket ticket-${ticket.status.toLowerCase()}`} key={ticket.id}>
       <div className="ticket-accent" /><div className="ticket-content">
         <div className="ticket-top"><div><span className="eyebrow">TicketFlow Pass</span><h3>{ticket.eventName ?? 'Evento'}</h3><p className="muted">{ticket.venueName ?? 'Venue por confirmar'}</p>{(ticket.venueAddress || ticket.venueCity) && <small>{[ticket.venueAddress, ticket.venueCity].filter(Boolean).join(' · ')}</small>}</div><Badge tone={ticket.status.toLowerCase()}>{ticket.status}</Badge></div>

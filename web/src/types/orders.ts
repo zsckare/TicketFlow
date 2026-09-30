@@ -26,6 +26,9 @@ export interface OrderItemResponse {
 
   unitPrice: string
   currency: string
+  status?: string
+  refundedAmount?: string
+  discountAmount?: string
 }
 
 export interface OrderResponse {
@@ -38,6 +41,8 @@ export interface OrderResponse {
 
   amount: string
   currency: string
+  discountAmount?: string
+  promotionCode?: string | null
 
   status: OrderStatus
 

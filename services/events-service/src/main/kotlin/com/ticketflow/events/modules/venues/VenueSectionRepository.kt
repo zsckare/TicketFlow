@@ -3,6 +3,7 @@ package com.ticketflow.events.modules.sections
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
+import org.jetbrains.exposed.sql.update
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.util.UUID
 
@@ -85,7 +86,9 @@ class VenueSectionRepository {
                     row[VenueSectionsTable.type],
                 ),
 
-            capacity =
-                row[VenueSectionsTable.capacity],
+            capacity = row[VenueSectionsTable.capacity],
+            mapX=row[VenueSectionsTable.mapX]?.toDouble(), mapY=row[VenueSectionsTable.mapY]?.toDouble(), mapWidth=row[VenueSectionsTable.mapWidth]?.toDouble(), mapHeight=row[VenueSectionsTable.mapHeight]?.toDouble(), mapRotation=row[VenueSectionsTable.mapRotation].toDouble(),
         )
+    fun updateMap(id:UUID,r:UpdateSectionMapRequest):VenueSectionResponse?=transaction{val updated=VenueSectionsTable.update({VenueSectionsTable.id eq id}){it[mapX]=r.x?.toBigDecimal();it[mapY]=r.y?.toBigDecimal();it[mapWidth]=r.width?.toBigDecimal();it[mapHeight]=r.height?.toBigDecimal();it[mapRotation]=r.rotation.toBigDecimal()};if(updated==0)null else VenueSectionsTable.selectAll().where{VenueSectionsTable.id eq id}.single().let(::toResponse)}
+
 }

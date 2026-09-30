@@ -60,6 +60,30 @@ fun Route.orderRoutes(service: OrderService, internalSecret: String) {
                 call.respond(service.findTickets(UUID.fromString(principal.payload.subject)))
             }
 
+            post("/promotions") { val principal=call.principal<JWTPrincipal>()!!;call.respond(HttpStatusCode.Created,service.createPromotion(call.receive<CreatePromotionRequest>(),principal.isAdmin())) }
+            get("/promotions") { val principal=call.principal<JWTPrincipal>()!!;call.respond(service.listPromotions(principal.isAdmin())) }
+            post("/{orderId}/promotion") { val principal=call.principal<JWTPrincipal>()!!;val orderId=parseUuid(call.parameters["orderId"])?:return@post call.respond(HttpStatusCode.BadRequest);val request=call.receive<ApplyPromotionRequest>();call.respond(service.applyPromotion(UUID.fromString(principal.payload.subject),orderId,request.code)) }
+
+            get("/tickets/transfers") {
+                val principal=call.principal<JWTPrincipal>()!!; val userId=UUID.fromString(principal.payload.subject); val email=principal.payload.getClaim("email").asString().orEmpty()
+                call.respond(service.findTransfers(userId,email))
+            }
+
+            post("/tickets/transfers/{token}/accept") {
+                val principal=call.principal<JWTPrincipal>()!!; val token=parseUuid(call.parameters["token"]) ?: return@post call.respond(HttpStatusCode.BadRequest); val email=principal.payload.getClaim("email").asString().orEmpty()
+                call.respond(service.acceptTransfer(UUID.fromString(principal.payload.subject),email,token))
+            }
+
+            post("/tickets/{ticketId}/transfer") {
+                val principal=call.principal<JWTPrincipal>()!!; val ticketId=parseUuid(call.parameters["ticketId"]) ?: return@post call.respond(HttpStatusCode.BadRequest); val request=call.receive<TransferTicketRequest>()
+                call.respond(HttpStatusCode.Created,service.createTransfer(UUID.fromString(principal.payload.subject),ticketId,request.recipientEmail))
+            }
+
+            get("/analytics/events/{eventId}") {
+                val principal=call.principal<JWTPrincipal>()!!; val eventId=parseUuid(call.parameters["eventId"]) ?: return@get call.respond(HttpStatusCode.BadRequest)
+                call.respond(service.eventAnalytics(eventId,principal.isAdmin()))
+            }
+
             get("/tickets/admin/search") {
                 val principal = call.principal<JWTPrincipal>()!!
                 if (!principal.isAdmin()) return@get call.respond(HttpStatusCode.Forbidden, mapOf("error" to "ADMIN role required"))
@@ -126,6 +150,11 @@ fun Route.orderRoutes(service: OrderService, internalSecret: String) {
                 val userEmail = principal.payload.getClaim("email").asString() ?: return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to "JWT has no email claim"))
                 val orderId = parseUuid(call.parameters["orderId"]) ?: return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid orderId"))
                 call.respond(service.checkout(userId, orderId, userEmail, call.receive<CheckoutRequest>(), principal.isAdmin()))
+            }
+
+            post("/{orderId}/tickets/{ticketId}/refund") {
+                val principal=call.principal<JWTPrincipal>()!!; val orderId=parseUuid(call.parameters["orderId"]) ?: return@post call.respond(HttpStatusCode.BadRequest); val ticketId=parseUuid(call.parameters["ticketId"]) ?: return@post call.respond(HttpStatusCode.BadRequest); val request=call.receive<RefundTicketRequest>()
+                call.respond(service.refundTicket(UUID.fromString(principal.payload.subject),orderId,ticketId,request.reason,principal.isAdmin()))
             }
 
             post("/{orderId}/cancel") {

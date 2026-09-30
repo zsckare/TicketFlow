@@ -273,4 +273,21 @@ if (excess > 0) {
         reservationId = row[TicketInventoryTable.reservationId]?.toString(),
         reservedUntil = row[TicketInventoryTable.reservedUntil]?.toString(),
     )
+    fun createPricingTier(eventId:UUID, request:CreatePricingTierRequest):PricingTierResponse=transaction{
+        val id=UUID.randomUUID();val now=OffsetDateTime.now();PricingTierTable.insert{it[PricingTierTable.id]=id;it[PricingTierTable.eventId]=eventId;it[sectionId]=UUID.fromString(request.sectionId);it[name]=request.name.trim();it[price]=request.price.toBigDecimal();it[currency]=request.currency.uppercase();it[salesStartAt]=request.salesStartAt?.let(OffsetDateTime::parse);it[salesEndAt]=request.salesEndAt?.let(OffsetDateTime::parse);it[priority]=request.priority;it[active]=request.active;it[createdAt]=now;it[updatedAt]=now};findPricingTierInternal(id)!!
+    }
+    fun findPricingTiers(eventId: UUID): List<PricingTierResponse> = transaction {PricingTierTable.selectAll().where{PricingTierTable.eventId eq eventId}.orderBy(PricingTierTable.priority to SortOrder.DESC).map(::toPricingTier)}
+    fun deletePricingTier(id:UUID):Boolean=transaction{PricingTierTable.deleteWhere{PricingTierTable.id eq id}>0}
+    fun effectivePrice(eventId:UUID,sectionId:UUID,base:BigDecimal,now:OffsetDateTime=OffsetDateTime.now()):BigDecimal=transaction{
+        PricingTierTable.selectAll().where{(PricingTierTable.eventId eq eventId) and (PricingTierTable.sectionId eq sectionId) and (PricingTierTable.active eq true)}.orderBy(PricingTierTable.priority to SortOrder.DESC).map(::toPricingTier).firstOrNull{(it.salesStartAt==null||!OffsetDateTime.parse(it.salesStartAt).isAfter(now))&&(it.salesEndAt==null||OffsetDateTime.parse(it.salesEndAt).isAfter(now))}?.price?.toBigDecimal()?:base
+    }
+    fun applyEffectivePrice(inventoryId:UUID):TicketInventoryResponse?=transaction{
+        val row=TicketInventoryTable.selectAll().where{TicketInventoryTable.id eq inventoryId}.singleOrNull()?:return@transaction null;val override=row[TicketInventoryTable.priceOverride];if(override!=null)return@transaction toResponse(row);val section=row[TicketInventoryTable.sectionId]?:return@transaction toResponse(row);val base=EventSectionInventoryTable.selectAll().where{(EventSectionInventoryTable.eventId eq row[TicketInventoryTable.eventId]) and (EventSectionInventoryTable.sectionId eq section)}.singleOrNull()?.get(EventSectionInventoryTable.basePrice)?:row[TicketInventoryTable.price];val effective=effectivePrice(row[TicketInventoryTable.eventId],section,base);if(effective!=row[TicketInventoryTable.price])TicketInventoryTable.update({TicketInventoryTable.id eq inventoryId}){it[price]=effective;it[updatedAt]=OffsetDateTime.now()};findByIdInternal(inventoryId)
+    }
+    private fun findPricingTierInternal(id:UUID)=PricingTierTable.selectAll().where{PricingTierTable.id eq id}.singleOrNull()?.let(::toPricingTier)
+    private fun toPricingTier(r:ResultRow)=PricingTierResponse(r[PricingTierTable.id].toString(),r[PricingTierTable.eventId].toString(),r[PricingTierTable.sectionId].toString(),r[PricingTierTable.name],r[PricingTierTable.price].toPlainString(),r[PricingTierTable.currency],r[PricingTierTable.salesStartAt]?.toString(),r[PricingTierTable.salesEndAt]?.toString(),r[PricingTierTable.priority],r[PricingTierTable.active])
+
+    fun hasPricingTiers(eventId:UUID,sectionId:UUID):Boolean=transaction{PricingTierTable.selectAll().where{(PricingTierTable.eventId eq eventId) and (PricingTierTable.sectionId eq sectionId) and (PricingTierTable.active eq true)}.any()}
+    fun hasActivePricingTier(eventId:UUID,sectionId:UUID,now:OffsetDateTime=OffsetDateTime.now()):Boolean=transaction{PricingTierTable.selectAll().where{(PricingTierTable.eventId eq eventId) and (PricingTierTable.sectionId eq sectionId) and (PricingTierTable.active eq true)}.map(::toPricingTier).any{(it.salesStartAt==null||!OffsetDateTime.parse(it.salesStartAt).isAfter(now))&&(it.salesEndAt==null||OffsetDateTime.parse(it.salesEndAt).isAfter(now))}}
+
 }

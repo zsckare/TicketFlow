@@ -46,6 +46,9 @@ data class OrderItemResponse(
     val seatLabel: String? = null,
     val unitPrice: String,
     val currency: String,
+    val status: String = "ACTIVE",
+    val refundedAmount: String = "0.00",
+    val discountAmount: String = "0.00",
 )
 
 @Serializable
@@ -57,6 +60,8 @@ data class OrderResponse(
     val paymentId: String? = null,
     val amount: String,
     val currency: String,
+    val discountAmount: String = "0.00",
+    val promotionCode: String? = null,
     val status: OrderStatus,
     val failureReason: String? = null,
     val items: List<OrderItemResponse> = emptyList(),

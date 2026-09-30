@@ -22,6 +22,7 @@ data class CreateVenueSectionRequest(
     val name: String,
     val type: VenueSectionType,
     val capacity: Int,
+    val mapX: Double? = null, val mapY: Double? = null, val mapWidth: Double? = null, val mapHeight: Double? = null, val mapRotation: Double = 0.0,
 )
 
 @Serializable
@@ -31,4 +32,6 @@ data class VenueSectionResponse(
     val name: String,
     val type: VenueSectionType,
     val capacity: Int,
+    val mapX: Double? = null, val mapY: Double? = null, val mapWidth: Double? = null, val mapHeight: Double? = null, val mapRotation: Double = 0.0,
 )
+@Serializable data class UpdateSectionMapRequest(val x:Double?=null,val y:Double?=null,val width:Double?=null,val height:Double?=null,val rotation:Double=0.0)

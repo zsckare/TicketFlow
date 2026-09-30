@@ -14,6 +14,9 @@ object OrderItemsTable : Table("order_items") {
     val seatId = uuid("seat_id").nullable()
     val unitPrice = decimal("unit_price", 12, 2)
     val currency = varchar("currency", 3)
+    val status = varchar("status", 20)
+    val refundedAmount = decimal("refunded_amount", 12, 2)
+    val discountAmount = decimal("discount_amount", 12, 2)
     val createdAt = timestampWithTimeZone("created_at")
     override val primaryKey = PrimaryKey(id)
 }

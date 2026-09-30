@@ -143,7 +143,7 @@ class TicketInventoryService(
         inventoryId: UUID,
     ): TicketInventoryResponse? {
         releaseExpired()
-        return repository.findById(inventoryId)
+        return repository.applyEffectivePrice(inventoryId)
     }
 
     /**
@@ -154,7 +154,7 @@ class TicketInventoryService(
         eventId: UUID,
     ): List<TicketInventoryResponse> {
         releaseExpired()
-        return repository.findByEvent(eventId)
+        return repository.findByEvent(eventId).map { repository.applyEffectivePrice(UUID.fromString(it.id)) ?: it }
     }
 
     /**
@@ -228,6 +228,12 @@ class TicketInventoryService(
          * La protección real continúa siendo el UPDATE
          * condicional del repository.
          */
+        val sectionId = existing.sectionId?.let(UUID::fromString)
+        if (sectionId != null && repository.hasPricingTiers(UUID.fromString(existing.eventId), sectionId) && !repository.hasActivePricingTier(UUID.fromString(existing.eventId), sectionId)) {
+            throw TicketInventoryConflictException("Tickets for this section are outside the active sales window")
+        }
+        repository.applyEffectivePrice(inventoryId)
+
         if (
             existing.status !=
             TicketInventoryStatus.AVAILABLE
@@ -423,5 +429,9 @@ class TicketInventoryService(
 
     private fun parseId(value: String, name: String): UUID =
         runCatching { UUID.fromString(value) }.getOrElse { throw IllegalArgumentException("Invalid $name ID") }
+
+    fun createPricingTier(eventId:UUID,request:CreatePricingTierRequest):PricingTierResponse { require(request.name.isNotBlank());require(request.price.toBigDecimal()>=BigDecimal.ZERO);return repository.createPricingTier(eventId,request) }
+    fun findPricingTiers(eventId:UUID)=repository.findPricingTiers(eventId)
+    fun deletePricingTier(id:UUID)=repository.deletePricingTier(id)
 
 }

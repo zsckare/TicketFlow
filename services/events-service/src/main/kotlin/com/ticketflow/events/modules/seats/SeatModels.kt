@@ -13,6 +13,7 @@ import kotlinx.serialization.Serializable
 data class CreateSeatRequest(
     val row: String,
     val number: String,
+    val mapX: Double? = null, val mapY: Double? = null,
 )
 
 /**
@@ -24,4 +25,6 @@ data class SeatResponse(
     val sectionId: String,
     val row: String,
     val number: String,
+    val mapX: Double? = null, val mapY: Double? = null,
 )
+@Serializable data class UpdateSeatMapRequest(val x:Double?=null,val y:Double?=null)

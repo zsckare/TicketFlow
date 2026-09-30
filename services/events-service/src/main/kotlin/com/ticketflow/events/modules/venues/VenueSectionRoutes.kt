@@ -6,6 +6,7 @@ import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
+import io.ktor.server.routing.put
 import io.ktor.server.routing.route
 import java.util.UUID
 
@@ -58,6 +59,8 @@ fun Route.venueSectionRoutes(
 
         call.respond(section)
     }
+
+    put("/sections/{sectionId}/map") { val id=call.parameters["sectionId"]?.let{runCatching{UUID.fromString(it)}.getOrNull()}?:return@put call.respond(HttpStatusCode.BadRequest);val result=service.updateMap(id,call.receive<UpdateSectionMapRequest>())?:return@put call.respond(HttpStatusCode.NotFound);call.respond(result) }
 
     route("/venues/{venueId}/sections") {
 

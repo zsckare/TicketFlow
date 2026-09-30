@@ -94,6 +94,7 @@ import {
 
 import { UsersPage } from './pages/admin/UsersPage'
 import { TicketsPage } from './pages/admin/TicketsPage'
+import { CommercePage } from './pages/admin/CommercePage'
 
 export default function App() {
     return (
@@ -291,6 +292,7 @@ export default function App() {
                     />
 
                     <Route path="tickets" element={<TicketsPage />} />
+                    <Route path="commerce" element={<CommercePage />} />
 
                     <Route path="users" element={<UsersPage />} />
 

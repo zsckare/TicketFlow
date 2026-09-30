@@ -157,11 +157,12 @@ class OrderService(
             val paymentId = order.paymentId ?: throw OrderOperationException("Confirmed order has no paymentId")
             val refund = paymentsClient.refund(paymentId)
             if (refund.status != PaymentStatus.REFUNDED) throw OrderOperationException("Payment could not be refunded")
-            order.items.forEach { item ->
+            order.items.filter { it.status == "ACTIVE" }.forEach { item ->
                 ticketsClient.restock(item.inventoryId)
                     ?: throw OrderOperationException("Refund succeeded but inventory could not be restocked")
             }
             repository.cancelIssuedTickets(orderId)
+            repository.refundActiveOrderItems(orderId)
             return enrich(repository.markCancelled(orderId) ?: throw OrderOperationException("Unable to cancel order"))
         }
 
@@ -269,6 +270,33 @@ class OrderService(
         }
         return closed
     }
+
+    fun createPromotion(request:CreatePromotionRequest,isAdmin:Boolean):PromotionResponse { if(!isAdmin) throw SecurityException("ADMIN role required");require(request.discountType.uppercase() in setOf("PERCENTAGE","FIXED"));return repository.createPromotion(request) }
+    fun listPromotions(isAdmin:Boolean):List<PromotionResponse> { if(!isAdmin) throw SecurityException("ADMIN role required");return repository.listPromotions() }
+    suspend fun applyPromotion(userId:UUID,orderId:UUID,code:String):OrderResponse = enrich(repository.applyPromotion(orderId,userId,code))
+
+    suspend fun refundTicket(userId: UUID, orderId: UUID, ticketId: UUID, reason: String?, isAdmin: Boolean): IssuedTicketResponse {
+        val order=findById(orderId); ensureOwner(order,userId,isAdmin)
+        require(order.status==OrderStatus.CONFIRMED) { "Only confirmed orders can be partially refunded" }
+        val ticket=repository.findTicketById(ticketId) ?: throw OrderOperationException("Ticket not found")
+        require(ticket.orderId==order.id) { "Ticket does not belong to order" }
+        require(ticket.status==IssuedTicketStatus.ISSUED) { "Used or cancelled tickets cannot be refunded" }
+        val item=order.items.firstOrNull { it.inventoryId==ticket.inventoryId } ?: throw OrderOperationException("Order item not found")
+        val paymentId=order.paymentId ?: throw OrderOperationException("Confirmed order has no payment")
+        val refund=paymentsClient.refund(paymentId,item.unitPrice.toBigDecimal().subtract(item.discountAmount.toBigDecimal()).toPlainString(),reason?:"Ticket refunded","ticket:${ticket.id}")
+        require(refund.status==PaymentStatus.PARTIALLY_REFUNDED || refund.status==PaymentStatus.REFUNDED) { "Payment could not be refunded" }
+        ticketsClient.restock(ticket.inventoryId) ?: throw OrderOperationException("Refund succeeded but inventory could not be restocked")
+        return enrich(repository.refundTicket(ticketId))
+    }
+
+    fun createTransfer(userId:UUID,ticketId:UUID,recipientEmail:String):TicketTransferResponse {
+        require(recipientEmail.contains("@")) { "A valid recipient email is required" }
+        return repository.transferTicket(ticketId,userId,recipientEmail.trim())
+    }
+
+    fun acceptTransfer(userId:UUID,userEmail:String,token:UUID):TicketTransferResponse = repository.acceptTransfer(token,userId,userEmail)
+    fun findTransfers(userId:UUID,userEmail:String):List<TicketTransferResponse> = repository.findTransfersFor(userEmail,userId)
+    suspend fun eventAnalytics(eventId:UUID,isAdmin:Boolean):EventSalesAnalyticsResponse { if(!isAdmin) throw SecurityException("ADMIN role required"); val base=repository.analytics(eventId);val total=ticketsClient.findByEvent(eventId.toString()).size;return base.copy(occupancyPercent=if(total==0)0.0 else (base.ticketsSold.toDouble()/total.toDouble()*100.0)) }
 
     fun checkInStats(eventId: UUID, isOperator: Boolean): CheckInStatsResponse {
         if (!isOperator) throw SecurityException("STAFF or ADMIN role required")

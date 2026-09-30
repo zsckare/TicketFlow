@@ -63,4 +63,6 @@ class VenueSectionService(
         id: UUID,
     ): VenueSectionResponse? =
         repository.findById(id)
+    fun updateMap(id:UUID,request:UpdateSectionMapRequest)=repository.updateMap(id,request)
+
 }

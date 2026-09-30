@@ -1,3 +1,6 @@
+import { useState } from 'react'
+import { commerceApi } from '../api/commerceApi'
+
 import {
   Link,
   useNavigate,
@@ -29,6 +32,7 @@ import {
  * navigation and browser reloads.
  */
 export function CartPage() {
+  const [promoCode,setPromoCode]=useState('')
   const navigate =
     useNavigate()
 
@@ -70,6 +74,8 @@ export function CartPage() {
         ],
       })
     }
+
+  const promotion=useMutation({mutationFn:({id,code}:{id:string;code:string})=>commerceApi.applyPromotion(id,code),onSuccess:refresh})
 
   const cancel =
     useMutation({
@@ -161,6 +167,9 @@ export function CartPage() {
           </Link>
         )}
       </div>
+
+      {!order.promotionCode && <section className="panel"><h3>Código promocional</h3><div className="inline-actions"><input value={promoCode} onChange={e=>setPromoCode(e.target.value.toUpperCase())} placeholder="PROMO2026"/><button className="button secondary" disabled={!promoCode||promotion.isPending} onClick={()=>promotion.mutate({id:order.id,code:promoCode})}>Aplicar</button></div>{promotion.error instanceof Error&&<ErrorState error={promotion.error}/>}</section>}
+      {order.promotionCode && <div className="alert success">Promoción <b>{order.promotionCode}</b> aplicada · descuento {order.discountAmount} {order.currency}</div>}
 
       <BookingCart
         selections={[]}

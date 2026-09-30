@@ -6,6 +6,7 @@ import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
+import io.ktor.server.routing.put
 import io.ktor.server.routing.route
 import java.util.UUID
 
@@ -61,6 +62,8 @@ fun Route.seatRoutes(
 
         call.respond(seat)
     }
+
+    put("/seats/{seatId}/map") { val id=call.parameters["seatId"]?.let{runCatching{UUID.fromString(it)}.getOrNull()}?:return@put call.respond(HttpStatusCode.BadRequest);val result=service.updateMap(id,call.receive<UpdateSeatMapRequest>())?:return@put call.respond(HttpStatusCode.NotFound);call.respond(result) }
 
     route("/sections/{sectionId}/seats") {
 
