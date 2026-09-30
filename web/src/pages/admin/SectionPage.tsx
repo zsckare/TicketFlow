@@ -1,25 +1,28 @@
-import {  useState } from 'react'
+import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { eventsApi } from '../../api/eventsApi'
-import { ErrorState, Loading } from '../../components/Ui'
+import { Empty, ErrorState, Loading } from '../../components/Ui'
+
 export function SectionPage() {
-  const {sectionId=''}=useParams(); const qc=useQueryClient()
-  const section=useQuery({queryKey:['section',sectionId],queryFn:()=>eventsApi.getSection(sectionId)})
-  const seats=useQuery({queryKey:['seats',sectionId],queryFn:()=>eventsApi.getSeats(sectionId)})
-  const [row,setRow]=useState('A'); const [number,setNumber]=useState('')
-  const create=useMutation({mutationFn:()=>eventsApi.createSeat(sectionId,{row,number}),onSuccess:()=>{setNumber('');void qc.invalidateQueries({queryKey:['seats',sectionId]})}})
-  if(section.isPending)return <Loading/>; if(section.isError)return <ErrorState error={section.error}/>
-  return <section><div className="section-title"><div><span className="eyebrow">Sección</span><h2>{section.data.name}</h2><p className="muted">{section.data.type}</p></div></div>
-    <div className="admin-grid">
-      <div className="panel"><h3>Nuevo asiento</h3>{section.data.type==='GENERAL_ADMISSION'?<div className="alert info">General Admission utiliza capacidad, no asientos individuales.</div>:
-      <form className="form" onSubmit={(e:FormEvent)=>{e.preventDefault();create.mutate()}}>
-        <label>Fila<input value={row} onChange={e=>setRow(e.target.value)} required/></label>
-        <label>Número<input value={number} onChange={e=>setNumber(e.target.value)} required/></label>
-        <button className="button primary">Crear asiento</button>{create.error&&<ErrorState error={create.error}/>}
-      </form>}</div>
-      <div className="panel"><h3>Asientos ({seats.data?.length??0})</h3><div className="mini-seat-grid">{seats.data?.map(s=><div key={s.id}><b>{s.row}{s.number}</b><small>{s.id.slice(0,8)}</small></div>)}</div></div>
-    </div>
+  const { sectionId = '' } = useParams()
+  const qc = useQueryClient()
+  const section = useQuery({ queryKey: ['section', sectionId], queryFn: () => eventsApi.getSection(sectionId) })
+  const seats = useQuery({ queryKey: ['seats', sectionId], queryFn: () => eventsApi.getSeats(sectionId), enabled: section.data?.type === 'RESERVED_SEATING' })
+  const [row, setRow] = useState('A')
+  const [number, setNumber] = useState('')
+  const create = useMutation({ mutationFn: () => eventsApi.createSeat(sectionId, { row: row.trim().toUpperCase(), number: number.trim() }), onSuccess: () => { setNumber(''); void qc.invalidateQueries({ queryKey: ['seats', sectionId] }) } })
+
+  if (section.isPending) return <Loading />
+  if (section.isError) return <ErrorState error={section.error} />
+  const isGeneral = section.data.type === 'GENERAL_ADMISSION'
+
+  return <section>
+    <div className="section-title"><div><span className="eyebrow">Configuración del venue</span><h2>{section.data.name}</h2><p className="muted">{isGeneral ? 'Admisión general' : 'Asientos numerados'} · capacidad {section.data.capacity}</p></div><span className="count-label">{isGeneral ? `${section.data.capacity} lugares` : `${seats.data?.length ?? 0} asientos`}</span></div>
+    {isGeneral ? <div className="panel empty-feature"><div className="feature-icon">◎</div><h3>Sección de admisión general</h3><p>Esta sección no necesita asientos individuales. La cantidad vendible y su precio se administran desde Inventario.</p></div> : <div className="admin-grid">
+      <div className="panel"><span className="eyebrow">Agregar localidad</span><h3>Nuevo asiento</h3><p className="muted">Crea cada localidad física usando fila y número.</p><form className="form" onSubmit={(e:FormEvent)=>{e.preventDefault();create.mutate()}}><div className="form-row"><label>Fila<input value={row} onChange={e=>setRow(e.target.value)} required/></label><label>Número<input value={number} onChange={e=>setNumber(e.target.value)} required/></label></div><button className="button primary" disabled={create.isPending}>{create.isPending ? 'Creando…' : 'Crear asiento'}</button>{create.error&&<ErrorState error={create.error}/>}</form></div>
+      <div className="panel"><div className="section-title compact"><div><span className="eyebrow">Mapa</span><h3>Asientos creados</h3></div><span className="count-label">{seats.data?.length ?? 0}</span></div>{!seats.data?.length ? <Empty>Aún no hay asientos en esta sección.</Empty> : <><div className="stage admin-stage">ESCENARIO</div><div className="mini-seat-grid seat-map-admin">{seats.data.map(seat=><div key={seat.id}><b>{seat.row}{seat.number}</b><small>Disponible para inventario</small></div>)}</div></>}</div>
+    </div>}
   </section>
 }
