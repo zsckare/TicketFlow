@@ -63,8 +63,8 @@ export interface OrderResponse {
  * checkoutUrl contains the Stripe Checkout URL.
  */
 export interface CheckoutResponse {
-  orderId: string
-  paymentId: string
-  paymentStatus: string
-  checkoutUrl?: string | null
+    order: OrderResponse
+    paymentId: string
+    paymentStatus: string
+    checkoutUrl?: string | null
 }

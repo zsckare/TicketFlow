@@ -79,14 +79,27 @@ export const ordersApi = {
      * Confirmation happens from Payments Service after the
      * payment succeeds.
      */
+    /**
+   * Starts payment for an existing RESERVED order.
+   *
+   * The frontend sends the URLs that the payment provider
+   * should use after completing or cancelling checkout.
+   *
+   * The browser redirect is not considered payment confirmation.
+   * The final confirmation is performed by Payments Service
+   * through the payment callback/webhook.
+   */
     checkout: (
         id: string,
     ) =>
         apiRequest<CheckoutResponse>(
             `/orders/${id}/checkout`,
-            {
-                method: 'POST',
-            },
+            json({
+                successUrl:
+                    `${window.location.origin}/checkout/success?orderId=${encodeURIComponent(id)}`,
+                cancelUrl:
+                    `${window.location.origin}/cart`,
+            }),
         ),
 
     cancel: (

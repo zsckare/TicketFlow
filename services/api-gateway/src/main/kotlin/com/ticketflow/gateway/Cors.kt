@@ -7,12 +7,16 @@ import io.ktor.server.application.install
 import io.ktor.server.plugins.cors.routing.CORS
 
 /**
- * Configura CORS para permitir que el frontend de TicketFlow
- * se comunique con el API Gateway desde un origen diferente.
+ * Configura CORS para permitir que los frontends de TicketFlow
+ * se comuniquen con el API Gateway desde orígenes autorizados.
  *
- * En desarrollo:
+ * Desarrollo local:
  * Frontend:    http://localhost:5174
  * API Gateway: http://localhost:8080
+ *
+ * Desarrollo mediante Tailscale:
+ * Frontend:    http://antonios-mac-mini.tail4c6258.ts.net:5174
+ * API Gateway: http://antonios-mac-mini.tail4c6258.ts.net:8080
  */
 fun Application.configureCors() {
     install(CORS) {
@@ -22,13 +26,26 @@ fun Application.configureCors() {
             schemes = listOf("http"),
         )
 
-        // También permitimos 127.0.0.1 por si accedemos
-        // al frontend usando esta dirección.
+        // Desarrollo local usando 127.0.0.1.
         allowHost(
             "127.0.0.1:5174",
             schemes = listOf("http"),
         )
 
+        // Frontend accesible desde dispositivos conectados
+        // a nuestra Tailnet mediante Tailscale MagicDNS.
+        allowHost(
+            "antonios-mac-mini.tail4c6258.ts.net:5174",
+            schemes = listOf("http"),
+        )
+
+        // Tailscale Serve.
+        // El frontend se sirve mediante HTTPS para permitir
+        // el acceso a la cámara desde dispositivos móviles.
+        allowHost(
+            "antonios-mac-mini.tail4c6258.ts.net",
+            schemes = listOf("https"),
+        )
         // Métodos utilizados por TicketFlow.
         allowMethod(HttpMethod.Get)
         allowMethod(HttpMethod.Post)

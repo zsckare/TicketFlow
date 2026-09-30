@@ -3,12 +3,30 @@ package com.ticketflow.orders.modules.orders
 import kotlinx.serialization.Serializable
 
 @Serializable
-enum class OrderStatus { PENDING, RESERVED, CONFIRMED, FAILED, CANCELLED }
+enum class OrderStatus {
+    PENDING,
+    RESERVED,
+    CONFIRMED,
+    FAILED,
+    CANCELLED,
+}
 
 @Serializable
 data class CreateOrderRequest(
     val inventoryIds: List<String> = emptyList(),
     val inventoryId: String? = null,
+)
+
+/**
+ * Information sent by the web application when checkout starts.
+ *
+ * Payments Service uses these URLs when the external payment provider
+ * redirects the customer after completing or cancelling checkout.
+ */
+@Serializable
+data class CheckoutRequest(
+    val successUrl: String,
+    val cancelUrl: String,
 )
 
 @Serializable
@@ -46,9 +64,16 @@ data class OrderResponse(
     val createdAt: String,
     val updatedAt: String,
 )
+
+/**
+ * Result returned to the frontend after checkout has been initialized.
+ *
+ * The order is included because a simulated payment can complete
+ * synchronously while the original checkout request is still executing.
+ */
 @Serializable
 data class CheckoutResponse(
-    val orderId: String,
+    val order: OrderResponse,
     val paymentId: String,
     val paymentStatus: String,
     val checkoutUrl: String? = null,

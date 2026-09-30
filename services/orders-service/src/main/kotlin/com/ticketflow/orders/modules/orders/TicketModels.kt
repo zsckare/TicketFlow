@@ -3,7 +3,11 @@ package com.ticketflow.orders.modules.orders
 import kotlinx.serialization.Serializable
 
 @Serializable
-enum class IssuedTicketStatus { ISSUED, USED, CANCELLED }
+enum class IssuedTicketStatus {
+    ISSUED,
+    USED,
+    CANCELLED,
+}
 
 @Serializable
 data class IssuedTicketResponse(
@@ -24,7 +28,27 @@ data class IssuedTicketResponse(
     val status: IssuedTicketStatus,
     val issuedAt: String,
     val checkedInAt: String? = null,
+
+    /**
+     * Signed payload encoded inside the QR.
+     *
+     * The client must treat this value as opaque and send it back unchanged
+     * when performing check-in.
+     */
+    val qrPayload: String? = null,
+
+    /**
+     * QR image represented as a data URL so the web application can render
+     * it directly without having to generate or sign QR codes client-side.
+     */
+    val qrDataUrl: String? = null,
 )
 
+/**
+ * Check-in now receives the complete signed QR payload instead of trusting
+ * a raw admission UUID supplied by the client.
+ */
 @Serializable
-data class CheckInRequest(val admissionToken: String)
+data class CheckInRequest(
+    val qrPayload: String,
+)

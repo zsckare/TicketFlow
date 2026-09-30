@@ -105,7 +105,7 @@ export function CheckoutPage() {
                     })
 
                     navigate(
-                        `/checkout/success?orderId=${response.orderId}`,
+                        `/checkout/success?orderId=${response.order.id}`,
                     )
                 },
         })
