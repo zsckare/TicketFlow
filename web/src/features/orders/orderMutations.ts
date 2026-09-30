@@ -12,17 +12,6 @@ export function useCreateOrder() {
   })
 }
 
-export function useConfirmOrder() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: ordersApi.confirm,
-    onSuccess: (order) => {
-      queryClient.setQueryData(['orders', order.id], order)
-      void queryClient.invalidateQueries({ queryKey: ['inventory'] })
-    },
-  })
-}
-
 export function useCancelOrder() {
   const queryClient = useQueryClient()
   return useMutation({

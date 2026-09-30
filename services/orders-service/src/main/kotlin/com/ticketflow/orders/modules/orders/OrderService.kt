@@ -1,7 +1,7 @@
 package com.ticketflow.orders.modules.orders
 
-import com.ticketflow.orders.clients.events.EventsClient
-import com.ticketflow.orders.clients.payments.CreatePaymentRequest
+import com.ticketflow.orders.clients.events.EventsClient 
+import com.ticketflow.orders.clients.payments.CreateCheckoutRequest
 import com.ticketflow.orders.clients.payments.PaymentStatus
 import com.ticketflow.orders.clients.payments.PaymentsClient
 import com.ticketflow.orders.clients.tickets.TicketInventoryStatus
@@ -51,41 +51,259 @@ class OrderService(
         return enrich(repository.markReserved(orderId) ?: repository.markFailed(orderId, "Unable to persist reservation"))
     }
 
-    suspend fun confirm(userId: UUID, orderId: UUID, userEmail: String, isAdmin: Boolean = false): OrderResponse {
-        val order = findById(orderId)
-        ensureOwner(order, userId, isAdmin)
-        if (order.status == OrderStatus.CONFIRMED) return enrich(order)
-        if (order.status != OrderStatus.RESERVED) throw InvalidOrderStateException("Only RESERVED orders can be confirmed")
 
-        // Validate every reservation before charging the customer.
-        order.items.forEach { item ->
-            val current = ticketsClient.findInventoryById(item.inventoryId)
-                ?: throw OrderOperationException("Reserved inventory no longer exists")
-            if (current.status != TicketInventoryStatus.RESERVED || current.reservationId != item.reservationId) {
-                repository.markCancelled(orderId)
-                throw InvalidOrderStateException("Reservation expired. Please select your tickets again")
-            }
-        }
+    suspend fun checkout(
+    userId: UUID,
+    orderId: UUID,
+    userEmail: String,
+    isAdmin: Boolean = false,
+): CheckoutResponse {
+    val order = findById(orderId)
 
-        val payment = paymentsClient.create(
-            CreatePaymentRequest(order.id, userId.toString(), order.amount, order.currency, "order-confirm-${order.id}")
+    ensureOwner(
+        order = order,
+        userId = userId,
+        isAdmin = isAdmin,
+    )
+
+    /*
+     * Solo una reservación activa puede iniciar checkout.
+     *
+     * Una orden CONFIRMED no necesita volver a pasar por
+     * Payments Service.
+     */
+    if (order.status != OrderStatus.RESERVED) {
+        throw InvalidOrderStateException(
+            "Only RESERVED orders can proceed to checkout",
         )
-        if (payment.status != PaymentStatus.SUCCEEDED) throw OrderOperationException("Payment was not successful")
-        repository.attachPayment(orderId, UUID.fromString(payment.id))
-            ?: throw OrderOperationException("Unable to attach payment to order")
+    }
 
-        order.items.forEach { item ->
-            val reservationId = item.reservationId ?: throw OrderOperationException("Order item has no reservationId")
-            val inventory = ticketsClient.confirm(item.inventoryId, reservationId)
-                ?: throw OrderOperationException("Ticket reservation could not be confirmed")
-            if (inventory.status != TicketInventoryStatus.SOLD) throw OrderOperationException("Tickets Service did not mark inventory as SOLD")
+    /*
+     * Antes de crear el pago verificamos que todas las
+     * reservaciones sigan vigentes en Tickets Service.
+     *
+     * Esto evita cobrar una orden cuyo inventario ya fue
+     * liberado por expiración.
+     */
+    order.items.forEach { item ->
+        val current =
+            ticketsClient.findInventoryById(
+                item.inventoryId,
+            )
+                ?: throw OrderOperationException(
+                    "Reserved inventory no longer exists",
+                )
+
+        if (
+            current.status != TicketInventoryStatus.RESERVED ||
+            current.reservationId != item.reservationId
+        ) {
+            repository.markCancelled(
+                orderId,
+            )
+
+            throw InvalidOrderStateException(
+                "Reservation expired. Please select your tickets again",
+            )
+        }
+    }
+
+    /*
+     * Creamos o recuperamos el pago.
+     *
+     * Payments Service utiliza idempotencyKey, por lo que
+     * repetir esta operación para la misma orden no debe
+     * crear un segundo pago.
+     */
+    val payment =
+        paymentsClient.createCheckout(
+            CreateCheckoutRequest(
+                orderId = order.id,
+                userId = userId.toString(),
+                userEmail = userEmail,
+                amount = order.amount,
+                currency = order.currency,
+                idempotencyKey =
+                    "order-checkout-${order.id}",
+                successUrl =
+                    "http://localhost:5174/checkout/success?orderId=${order.id}",
+                cancelUrl =
+                    "http://localhost:5174/cart",
+            ),
+        )
+
+    /*
+     * IMPORTANTE:
+     *
+     * En proveedores reales como Stripe, normalmente
+     * createCheckout() regresa mientras el pago sigue
+     * PENDING. En ese caso todavía debemos asociar el
+     * paymentId a la orden.
+     *
+     * Sin embargo, SIMULATED completa el pago
+     * inmediatamente:
+     *
+     * Orders
+     *   -> Payments /checkout
+     *   -> Payment SUCCEEDED
+     *   -> Orders /payment-succeeded
+     *   -> paymentSucceeded()
+     *   -> attachPayment()
+     *   -> CONFIRMED
+     *   -> regresa a checkout()
+     *
+     * Por eso debemos volver a consultar la orden antes
+     * de intentar asociar el pago.
+     */
+    val orderAfterPayment =
+        findById(orderId)
+
+    when {
+        /*
+         * Caso normal de un proveedor asíncrono:
+         * todavía no llegó el webhook/callback.
+         */
+        orderAfterPayment.paymentId == null -> {
+            repository.attachPayment(
+                orderId,
+                UUID.fromString(
+                    payment.id,
+                ),
+            ) ?: throw OrderOperationException(
+                "Unable to attach payment to order",
+            )
         }
 
-        val confirmed = repository.markConfirmed(orderId, userEmail)
-            ?: throw OrderOperationException("Unable to mark order as CONFIRMED")
-        repository.issueTickets(orderId, userId)
-        return enrich(confirmed)
+        /*
+         * El callback ya asoció exactamente este pago.
+         *
+         * Es el comportamiento esperado con SIMULATED
+         * y también puede ocurrir con un webhook real
+         * extremadamente rápido.
+         *
+         * No hacemos nada: la operación ya está hecha.
+         */
+        orderAfterPayment.paymentId ==
+            payment.id -> {
+            // Payment already attached.
+        }
+
+        /*
+         * La orden ya tiene OTRO paymentId.
+         *
+         * Esto sí representa una inconsistencia y no
+         * debemos continuar silenciosamente.
+         */
+        else -> {
+            throw OrderOperationException(
+                "Order already belongs to another payment",
+            )
+        }
     }
+
+    return CheckoutResponse(
+        orderId = order.id,
+        paymentId = payment.id,
+        paymentStatus =
+            payment.status.name,
+        checkoutUrl =
+            payment.checkoutUrl,
+    )
+}
+
+/**
+ * Confirma la orden después de que Payments Service haya
+ * validado el pago.
+ *
+ * Este método NO debe ser llamado directamente por el navegador.
+ * Es utilizado por el callback interno proveniente de Payments.
+ */
+suspend fun paymentSucceeded(
+    orderId: UUID,
+    paymentId: UUID,
+    userEmail: String,
+): OrderResponse {
+    val order = findById(orderId)
+
+    // Hace el callback idempotente.
+    if (order.status == OrderStatus.CONFIRMED) {
+        return enrich(order)
+    }
+
+    if (order.status != OrderStatus.RESERVED) {
+        throw InvalidOrderStateException(
+            "Only RESERVED orders can be confirmed",
+        )
+    }
+
+    // El payment asociado al callback debe ser el mismo
+    // que fue creado durante checkout.
+    if (
+        order.paymentId != null &&
+        order.paymentId != paymentId.toString()
+    ) {
+        throw OrderOperationException(
+            "Payment does not belong to this order",
+        )
+    }
+
+    if (order.paymentId == null) {
+        repository.attachPayment(
+            orderId,
+            paymentId,
+        ) ?: throw OrderOperationException(
+            "Unable to attach payment to order",
+        )
+    }
+
+    // Convertimos cada reservación temporal en inventario vendido.
+    order.items.forEach { item ->
+        val reservationId =
+            item.reservationId
+                ?: throw OrderOperationException(
+                    "Order item has no reservationId",
+                )
+
+        val inventory =
+            ticketsClient.confirm(
+                item.inventoryId,
+                reservationId,
+            )
+                ?: throw OrderOperationException(
+                    "Ticket reservation could not be confirmed",
+                )
+
+        if (
+            inventory.status !=
+            TicketInventoryStatus.SOLD
+        ) {
+            throw OrderOperationException(
+                "Tickets Service did not mark inventory as SOLD",
+            )
+        }
+    }
+
+    val confirmed =
+        repository.markConfirmed(
+            orderId,
+            userEmail,
+        )
+            ?: throw OrderOperationException(
+                "Unable to mark order as CONFIRMED",
+            )
+
+    repository.issueTickets(
+        orderId,
+        UUID.fromString(
+            confirmed.userId
+                ?: throw OrderOperationException(
+                    "Confirmed order has no userId",
+                ),
+        ),
+    )
+
+    return enrich(confirmed)
+}
 
     suspend fun cancel(userId: UUID, orderId: UUID, isAdmin: Boolean = false): OrderResponse {
         val order = findById(orderId)

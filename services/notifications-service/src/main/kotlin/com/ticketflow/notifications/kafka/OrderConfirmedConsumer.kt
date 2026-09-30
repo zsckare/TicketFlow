@@ -1,6 +1,8 @@
 package com.ticketflow.notifications.kafka
 
 import com.ticketflow.notifications.NotificationRepository
+import com.ticketflow.notifications.NotificationStatus
+import com.ticketflow.notifications.Mailer
 import io.ktor.server.application.*
 import kotlinx.coroutines.*
 import kotlinx.serialization.json.Json
@@ -22,6 +24,7 @@ fun Application.configureOrderConfirmedConsumer() {
     val consumer = KafkaConsumer<String, String>(props)
     consumer.subscribe(listOf(environment.config.property("kafka.orderConfirmedTopic").getString()))
     val repository = NotificationRepository()
+    val mailer = Mailer(environment.config.property("mail.host").getString(), environment.config.property("mail.port").getString().toInt(), environment.config.property("mail.from").getString())
     val json = Json { ignoreUnknownKeys = true }
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     scope.launch {
@@ -30,7 +33,8 @@ fun Application.configureOrderConfirmedConsumer() {
                 val records = consumer.poll(Duration.ofSeconds(1))
                 for (record in records) {
                     val event = json.decodeFromString<OrderConfirmedEvent>(record.value())
-                    repository.createOrderConfirmed(event)
+                    val status = try { mailer.send(event.userEmail, "Your TicketFlow order is confirmed", "Your order ${event.orderId} for ${event.amount} ${event.currency} has been confirmed. Your tickets are ready in My Tickets."); NotificationStatus.SENT } catch (mailError: Exception) { environment.log.error("Email delivery failed", mailError); NotificationStatus.FAILED }
+                    repository.createOrderConfirmed(event, status)
                 }
                 if (!records.isEmpty) consumer.commitSync()
             } catch (e: Exception) { environment.log.error("OrderConfirmed consumer failed", e); delay(1000) }

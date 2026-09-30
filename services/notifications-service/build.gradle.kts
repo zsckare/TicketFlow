@@ -37,6 +37,8 @@ dependencies {
     implementation("io.ktor:ktor-server-auth-jwt")
     implementation("com.auth0:java-jwt:4.5.0")
 
+    implementation("org.eclipse.angus:jakarta.mail:2.0.3")
+
     // Kafka consumer for asynchronous domain events.
     implementation("org.apache.kafka:kafka-clients:4.1.0")
 

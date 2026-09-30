@@ -49,6 +49,7 @@ dependencies {
     implementation("io.ktor:ktor-server-auth")
     implementation("io.ktor:ktor-server-auth-jwt")
     implementation("com.auth0:java-jwt:4.5.0")
+    implementation("com.google.zxing:core:3.5.3")
 
     testImplementation(kotlin("test"))
     testImplementation(ktorLibs.server.testHost)

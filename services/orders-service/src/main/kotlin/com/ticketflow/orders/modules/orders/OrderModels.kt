@@ -46,3 +46,16 @@ data class OrderResponse(
     val createdAt: String,
     val updatedAt: String,
 )
+@Serializable
+data class CheckoutResponse(
+    val orderId: String,
+    val paymentId: String,
+    val paymentStatus: String,
+    val checkoutUrl: String? = null,
+)
+
+@Serializable
+data class PaymentSucceededRequest(
+    val paymentId: String,
+    val userEmail: String,
+)

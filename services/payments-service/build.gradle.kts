@@ -23,6 +23,9 @@ dependencies {
     implementation(ktorLibs.server.core)
     implementation(ktorLibs.server.netty)
     implementation(ktorLibs.server.statusPages)
+    implementation("io.ktor:ktor-client-core")
+    implementation("io.ktor:ktor-client-cio")
+    implementation("io.ktor:ktor-client-content-negotiation")
     implementation(libs.logback.classic)
 
     implementation("org.jetbrains.exposed:exposed-core:0.61.0")

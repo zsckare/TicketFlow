@@ -24,3 +24,8 @@ jwt:
   secret: "$JWT_SECRET:ticketflow-dev-secret-change-me"
   issuer: "$JWT_ISSUER:ticketflow-users"
   audience: "$JWT_AUDIENCE:ticketflow-api"
+
+mail:
+  host: "$SMTP_HOST:localhost"
+  port: "$SMTP_PORT:1025"
+  from: "$MAIL_FROM:tickets@ticketflow.local"

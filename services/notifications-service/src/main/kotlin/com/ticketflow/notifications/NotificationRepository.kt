@@ -13,11 +13,11 @@ class NotificationRepository {
     }
 
     /** Idempotent event handler: one notification per Kafka eventId. */
-    fun createOrderConfirmed(event: OrderConfirmedEvent): NotificationResponse = transaction {
+    fun createOrderConfirmed(event: OrderConfirmedEvent, deliveryStatus: NotificationStatus = NotificationStatus.SENT): NotificationResponse = transaction {
         val eventId = UUID.fromString(event.eventId)
         findByEventId(eventId) ?: insertNotification(
             eventId, UUID.fromString(event.userId), "ORDER_CONFIRMED", event.userEmail,
-            "Order confirmed", "Your order ${event.orderId} for ${event.amount} ${event.currency} has been confirmed."
+            "Your TicketFlow order is confirmed", "Your order ${event.orderId} for ${event.amount} ${event.currency} has been confirmed. Your tickets are ready in My Tickets.", deliveryStatus
         )
     }
 
@@ -27,12 +27,12 @@ class NotificationRepository {
             .orderBy(NotificationsTable.createdAt to SortOrder.DESC).map(::toResponse)
     }
 
-    private fun insertNotification(eventId: UUID?, userId: UUID, type: String, destination: String, subject: String, body: String): NotificationResponse {
+    private fun insertNotification(eventId: UUID?, userId: UUID, type: String, destination: String, subject: String, body: String, deliveryStatus: NotificationStatus = NotificationStatus.SENT): NotificationResponse {
         val id = UUID.randomUUID()
         NotificationsTable.insert {
             it[NotificationsTable.id] = id; it[NotificationsTable.eventId] = eventId; it[NotificationsTable.userId] = userId
             it[NotificationsTable.type] = type; it[NotificationsTable.destination] = destination; it[NotificationsTable.subject] = subject
-            it[NotificationsTable.body] = body; it[status] = NotificationStatus.SENT.name; it[createdAt] = OffsetDateTime.now(ZoneOffset.UTC)
+            it[NotificationsTable.body] = body; it[status] = deliveryStatus.name; it[createdAt] = OffsetDateTime.now(ZoneOffset.UTC)
         }
         return findInternal(id)!!
     }
