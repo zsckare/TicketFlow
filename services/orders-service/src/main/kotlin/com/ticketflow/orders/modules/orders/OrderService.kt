@@ -6,6 +6,7 @@ import com.ticketflow.orders.clients.payments.PaymentStatus
 import com.ticketflow.orders.clients.payments.PaymentsClient
 import com.ticketflow.orders.clients.tickets.TicketInventoryStatus
 import com.ticketflow.orders.clients.tickets.TicketsClient
+import com.ticketflow.orders.outbox.OrderConfirmedItem
 import java.time.OffsetDateTime
 import java.util.UUID
 import javax.crypto.Mac
@@ -113,7 +114,25 @@ class OrderService(
             val inventory = ticketsClient.confirm(item.inventoryId, reservationId) ?: throw OrderOperationException("Ticket reservation could not be confirmed")
             if (inventory.status != TicketInventoryStatus.SOLD) throw OrderOperationException("Tickets Service did not mark inventory as SOLD")
         }
-        val confirmed = repository.markConfirmed(orderId, userEmail) ?: throw OrderOperationException("Unable to mark order as CONFIRMED")
+        // Capture display data while the order is being confirmed so the
+        // asynchronous notification does not need to call other services.
+        val enrichedOrder = enrich(order)
+        val confirmedItems = enrichedOrder.items.map { item ->
+            OrderConfirmedItem(
+                inventoryId = item.inventoryId,
+                eventId = item.eventId,
+                eventName = item.eventName,
+                eventStartsAt = item.eventStartsAt,
+                venueName = item.venueName,
+                sectionName = item.sectionName,
+                sectionType = item.sectionType,
+                seatLabel = item.seatLabel,
+                unitPrice = item.unitPrice,
+                currency = item.currency,
+            )
+        }
+        val confirmed = repository.markConfirmed(orderId, userEmail, confirmedItems)
+            ?: throw OrderOperationException("Unable to mark order as CONFIRMED")
         repository.issueTickets(orderId, UUID.fromString(requireNotNull(confirmed.userId)))
         return enrich(confirmed)
     }

@@ -2,6 +2,7 @@ package com.ticketflow.orders.modules.orders
 
 import com.ticketflow.orders.clients.tickets.TicketInventoryResponse
 import com.ticketflow.orders.outbox.OrderConfirmedEvent
+import com.ticketflow.orders.outbox.OrderConfirmedItem
 import com.ticketflow.orders.outbox.OutboxEventsTable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -63,21 +64,51 @@ class OrderRepository {
         if (updated == 0) null else findByIdInternal(orderId)
     }
 
-    fun markConfirmed(orderId: UUID, userEmail: String): OrderResponse? = transaction {
+    fun markConfirmed(
+        orderId: UUID,
+        userEmail: String,
+        confirmedItems: List<OrderConfirmedItem>,
+    ): OrderResponse? = transaction {
         val now = OffsetDateTime.now(ZoneOffset.UTC)
-        val updated = OrdersTable.update({ (OrdersTable.id eq orderId) and (OrdersTable.status eq OrderStatus.RESERVED.name) }) {
-            it[status] = OrderStatus.CONFIRMED.name; it[failureReason] = null; it[updatedAt] = now
+        val updated = OrdersTable.update({
+            (OrdersTable.id eq orderId) and
+                (OrdersTable.status eq OrderStatus.RESERVED.name)
+        }) {
+            it[status] = OrderStatus.CONFIRMED.name
+            it[failureReason] = null
+            it[updatedAt] = now
         }
+
         if (updated == 0) return@transaction null
+
         val order = findByIdInternal(orderId)!!
-        val eventId = UUID.randomUUID()
-        val event = OrderConfirmedEvent(eventId.toString(), now.toString(), order.id, requireNotNull(order.userId), userEmail,
-            order.items.first().inventoryId, requireNotNull(order.paymentId), order.amount, order.currency)
+        val outboxEventId = UUID.randomUUID()
+        val event = OrderConfirmedEvent(
+            eventId = outboxEventId.toString(),
+            occurredAt = now.toString(),
+            orderId = order.id,
+            userId = requireNotNull(order.userId),
+            userEmail = userEmail,
+            paymentId = requireNotNull(order.paymentId),
+            amount = order.amount,
+            currency = order.currency,
+            items = confirmedItems,
+        )
+
         OutboxEventsTable.insert {
-            it[id]=eventId; it[aggregateType]="Order"; it[aggregateId]=orderId; it[eventType]="OrderConfirmed"
-            it[topic]="ticketflow.orders.confirmed"; it[eventKey]=orderId.toString(); it[payload]=Json.encodeToString(event)
-            it[createdAt]=now; it[publishedAt]=null; it[attempts]=0; it[lastError]=null
+            it[id] = outboxEventId
+            it[aggregateType] = "Order"
+            it[aggregateId] = orderId
+            it[eventType] = "OrderConfirmed"
+            it[topic] = "ticketflow.orders.confirmed"
+            it[eventKey] = orderId.toString()
+            it[payload] = Json.encodeToString(event)
+            it[createdAt] = now
+            it[publishedAt] = null
+            it[attempts] = 0
+            it[lastError] = null
         }
+
         order
     }
 

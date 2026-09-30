@@ -22,7 +22,7 @@ class Mailer(
         message.setFrom(from)
         message.setRecipients(Message.RecipientType.TO, to)
         message.setSubject(subject, "UTF-8")
-        message.setText(body, "UTF-8")
+        message.setContent(body, "text/html; charset=UTF-8")
         Transport.send(message)
     }
 }

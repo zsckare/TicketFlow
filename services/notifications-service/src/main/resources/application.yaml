@@ -29,3 +29,6 @@ mail:
   host: "$SMTP_HOST:localhost"
   port: "$SMTP_PORT:1025"
   from: "$MAIL_FROM:tickets@ticketflow.local"
+
+web:
+  baseUrl: "$WEB_BASE_URL:http://localhost:5174"
