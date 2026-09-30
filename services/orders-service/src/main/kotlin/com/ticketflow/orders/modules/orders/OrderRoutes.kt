@@ -60,6 +60,23 @@ fun Route.orderRoutes(service: OrderService, internalSecret: String) {
                 call.respond(service.findTickets(UUID.fromString(principal.payload.subject)))
             }
 
+            get("/tickets/admin/search") {
+                val principal = call.principal<JWTPrincipal>()!!
+                if (!principal.isAdmin()) return@get call.respond(HttpStatusCode.Forbidden, mapOf("error" to "ADMIN role required"))
+                call.respond(service.findTicketsForAdmin(call.request.queryParameters["q"]))
+            }
+
+            get("/tickets/{ticketId}") {
+                val principal = call.principal<JWTPrincipal>()!!
+                val ticketId = parseUuid(call.parameters["ticketId"])
+                    ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid ticketId"))
+                call.respond(service.findTicket(
+                    UUID.fromString(principal.payload.subject),
+                    ticketId,
+                    principal.isAdmin(),
+                ))
+            }
+
             get("/tickets/{ticketId}/pdf") {
                 val principal = call.principal<JWTPrincipal>()!!
                 val ticketId = parseUuid(call.parameters["ticketId"])
@@ -86,7 +103,12 @@ fun Route.orderRoutes(service: OrderService, internalSecret: String) {
                 val request = call.receive<CheckInRequest>()
                 val expectedEventId = request.eventId?.let(::parseUuid)
                 if (request.eventId != null && expectedEventId == null) return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid eventId"))
-                call.respond(service.checkIn(request.qrPayload, expectedEventId, principal.isOperator()))
+                call.respond(service.checkIn(
+                    request.qrPayload,
+                    expectedEventId,
+                    UUID.fromString(principal.payload.subject),
+                    principal.isOperator(),
+                ))
             }
 
             get("/{orderId}") {

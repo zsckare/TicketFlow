@@ -1912,3 +1912,12 @@ td code {
         height: 190px;
     }
 }
+/* Ticket detail and post-purchase additions */
+.ticket-detail-page .digital-ticket { max-width: 880px; margin-inline: auto; }
+.ticket-audit { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+.ticket-audit span { display: flex; flex-direction: column; gap: .3rem; }
+.success-ticket-list { width: min(100%, 620px); display: grid; gap: .75rem; margin: 1.5rem auto; text-align: left; }
+.success-ticket-link { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem 1.1rem; border: 1px solid var(--border); border-radius: 14px; text-decoration: none; background: var(--surface); }
+.success-ticket-link span { display: flex; flex-direction: column; gap: .2rem; }
+.success-ticket-link:hover { transform: translateY(-1px); }
+@media (max-width: 640px) { .ticket-audit { grid-template-columns: 1fr; } .success-ticket-link { align-items: flex-start; flex-direction: column; } }

@@ -121,7 +121,7 @@ class OrderRepository {
             if (!exists) IssuedTicketsTable.insert {
                 it[id] = UUID.randomUUID(); it[IssuedTicketsTable.orderId] = orderId; it[orderItemId] = itemId; it[IssuedTicketsTable.userId] = userId
                 it[eventId] = item[OrderItemsTable.eventId]; it[inventoryId] = item[OrderItemsTable.inventoryId]; it[sectionId] = item[OrderItemsTable.sectionId]; it[seatId] = item[OrderItemsTable.seatId]
-                it[admissionToken] = UUID.randomUUID(); it[status] = IssuedTicketStatus.ISSUED.name; it[issuedAt] = now; it[checkedInAt] = null
+                it[admissionToken] = UUID.randomUUID(); it[status] = IssuedTicketStatus.ISSUED.name; it[issuedAt] = now; it[checkedInAt] = null; it[checkedInByUserId] = null
             }
         }
         findTicketsByOrderInternal(orderId)
@@ -147,11 +147,26 @@ class OrderRepository {
         IssuedTicketsTable.selectAll().where { IssuedTicketsTable.admissionToken eq token }.singleOrNull()?.let(::toTicket)
     }
 
-    fun checkIn(token: UUID): IssuedTicketResponse? = transaction {
-        val row = IssuedTicketsTable.selectAll().where { IssuedTicketsTable.admissionToken eq token }.singleOrNull() ?: return@transaction null
-        if (row[IssuedTicketsTable.status] != IssuedTicketStatus.ISSUED.name) throw IllegalStateException("Ticket has already been used or cancelled")
-        IssuedTicketsTable.update({ IssuedTicketsTable.admissionToken eq token }) { it[status] = IssuedTicketStatus.USED.name; it[checkedInAt] = OffsetDateTime.now(ZoneOffset.UTC) }
-        IssuedTicketsTable.selectAll().where { IssuedTicketsTable.admissionToken eq token }.single().let(::toTicket)
+    fun checkIn(token: UUID, checkedInByUserId: UUID): IssuedTicketResponse? = transaction {
+        val updated = IssuedTicketsTable.update({
+            (IssuedTicketsTable.admissionToken eq token) and
+                (IssuedTicketsTable.status eq IssuedTicketStatus.ISSUED.name)
+        }) {
+            it[status] = IssuedTicketStatus.USED.name
+            it[checkedInAt] = OffsetDateTime.now(ZoneOffset.UTC)
+            it[IssuedTicketsTable.checkedInByUserId] = checkedInByUserId
+        }
+        if (updated == 0) throw IllegalStateException("Ticket has already been used or cancelled")
+        IssuedTicketsTable.selectAll()
+            .where { IssuedTicketsTable.admissionToken eq token }
+            .single()
+            .let(::toTicket)
+    }
+
+    fun findAllTickets(): List<IssuedTicketResponse> = transaction {
+        IssuedTicketsTable.selectAll()
+            .orderBy(IssuedTicketsTable.issuedAt to SortOrder.DESC)
+            .map(::toTicket)
     }
 
     fun cancelIssuedTickets(orderId: UUID) = transaction {
@@ -171,6 +186,7 @@ class OrderRepository {
         status = IssuedTicketStatus.valueOf(row[IssuedTicketsTable.status]),
         issuedAt = row[IssuedTicketsTable.issuedAt].toString(),
         checkedInAt = row[IssuedTicketsTable.checkedInAt]?.toString(),
+        checkedInByUserId = row[IssuedTicketsTable.checkedInByUserId]?.toString(),
     )
 
     fun markCancelled(orderId: UUID): OrderResponse? = transaction {

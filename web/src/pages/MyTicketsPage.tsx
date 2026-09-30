@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { myTicketsApi } from '../api/myTicketsApi'
 import { Badge, Empty, ErrorState, Loading } from '../components/Ui'
@@ -23,7 +24,7 @@ export function MyTicketsPage() {
         {ticket.status === 'ISSUED' && ticket.qrDataUrl && <div className="ticket-qr"><div className="ticket-qr-image"><img src={ticket.qrDataUrl} alt={`QR de acceso para ${ticket.eventName ?? 'el evento'}`} /></div><div className="ticket-qr-copy"><small>CÓDIGO DE ACCESO</small><strong>Presenta este QR en la entrada</strong><p>Este código es único. No lo compartas con otras personas.</p></div></div>}
         {ticket.checkedInAt && <div className="ticket-used">✓ Utilizado {formatDateInTimeZone(ticket.checkedInAt, ticket.venueTimezone)}</div>}
         {ticket.status === 'CANCELLED' && <div className="alert info">Este boleto fue cancelado y ya no permite acceso.</div>}
-        <div className="inline-actions"><button className="button secondary" disabled={downloading === ticket.id} onClick={() => void download(ticket.id)}>{downloading === ticket.id ? 'Generando PDF…' : 'Descargar PDF'}</button></div>
+        <div className="inline-actions"><Link className="button primary" to={`/tickets/${ticket.id}`}>Ver boleto</Link><button className="button secondary" disabled={downloading === ticket.id} onClick={() => void download(ticket.id)}>{downloading === ticket.id ? 'Generando PDF…' : 'Descargar PDF'}</button></div>
       </div>
     </article>)}</div>}
   </main>

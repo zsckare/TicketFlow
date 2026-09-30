@@ -44,6 +44,8 @@ import {
     MyTicketsPage,
 } from './pages/MyTicketsPage'
 
+import { TicketDetailPage } from './pages/TicketDetailPage'
+
 import {
     CartPage,
 } from './pages/CartPage'
@@ -91,6 +93,7 @@ import {
 } from './pages/admin/CheckInPage'
 
 import { UsersPage } from './pages/admin/UsersPage'
+import { TicketsPage } from './pages/admin/TicketsPage'
 
 export default function App() {
     return (
@@ -216,6 +219,15 @@ export default function App() {
                     }
                 />
 
+                <Route
+                    path="tickets/:ticketId"
+                    element={
+                        <ProtectedRoute>
+                            <TicketDetailPage />
+                        </ProtectedRoute>
+                    }
+                />
+
                 <Route path="staff/check-in" element={<ProtectedRoute role="STAFF"><main className="page"><CheckInPage /></main></ProtectedRoute>} />
 
                 {/* Administration */}
@@ -277,6 +289,8 @@ export default function App() {
                             <OrdersPage />
                         }
                     />
+
+                    <Route path="tickets" element={<TicketsPage />} />
 
                     <Route path="users" element={<UsersPage />} />
 

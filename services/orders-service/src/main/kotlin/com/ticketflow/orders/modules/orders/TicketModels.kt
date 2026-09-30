@@ -31,6 +31,7 @@ data class IssuedTicketResponse(
     val status: IssuedTicketStatus,
     val issuedAt: String,
     val checkedInAt: String? = null,
+    val checkedInByUserId: String? = null,
 
     /**
      * Signed payload encoded inside the QR.

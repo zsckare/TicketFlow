@@ -212,6 +212,33 @@ class OrderService(
     suspend fun findTickets(userId: UUID): List<IssuedTicketResponse> =
         repository.findTicketsByUser(userId).map { enrich(it) }
 
+    suspend fun findTicket(userId: UUID, ticketId: UUID, isAdmin: Boolean = false): IssuedTicketResponse {
+        val ticket = repository.findTicketById(ticketId) ?: throw OrderOperationException("Ticket not found")
+        if (!isAdmin && ticket.userId != userId.toString()) {
+            throw SecurityException("Ticket does not belong to authenticated user")
+        }
+        return enrich(ticket)
+    }
+
+    suspend fun findTicketsForAdmin(query: String?): List<IssuedTicketResponse> {
+        val tickets = repository.findAllTickets().map { enrich(it) }
+        val term = query?.trim()?.lowercase().orEmpty()
+        if (term.isBlank()) return tickets
+        return tickets.filter { ticket ->
+            listOfNotNull(
+                ticket.id,
+                ticket.orderId,
+                ticket.userId,
+                ticket.eventId,
+                ticket.eventName,
+                ticket.venueName,
+                ticket.sectionName,
+                ticket.seatLabel,
+                ticket.status.name,
+            ).any { it.lowercase().contains(term) }
+        }
+    }
+
     suspend fun ticketPdf(userId: UUID, ticketId: UUID, isAdmin: Boolean): ByteArray {
         val raw = repository.findTicketById(ticketId) ?: throw OrderOperationException("Ticket not found")
         if (!isAdmin && raw.userId != userId.toString()) throw SecurityException("Ticket does not belong to authenticated user")
@@ -248,7 +275,7 @@ class OrderService(
         return repository.ticketStats(eventId)
     }
 
-    suspend fun checkIn(payload: String, expectedEventId: UUID?, isOperator: Boolean): IssuedTicketResponse {
+    suspend fun checkIn(payload: String, expectedEventId: UUID?, operatorUserId: UUID, isOperator: Boolean): IssuedTicketResponse {
         if (!isOperator) throw SecurityException("STAFF or ADMIN role required")
 
         val token = verifyQrPayload(payload)
@@ -261,7 +288,7 @@ class OrderService(
         if (expectedEventId != null && ticketBefore.eventId != expectedEventId.toString()) {
             throw OrderOperationException("Ticket belongs to a different event")
         }
-        val ticket = repository.checkIn(token)
+        val ticket = repository.checkIn(token, operatorUserId)
             ?: throw OrderOperationException("Ticket not found")
 
         if (ticket.status != IssuedTicketStatus.USED) {
