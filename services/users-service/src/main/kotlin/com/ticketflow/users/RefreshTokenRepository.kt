@@ -78,6 +78,12 @@ class RefreshTokenRepository {
         }
     }
 
+    fun revokeAllForUser(userId: UUID) = transaction {
+        RefreshTokensTable.update({
+            (RefreshTokensTable.userId eq userId) and RefreshTokensTable.revokedAt.isNull()
+        }) { it[revokedAt] = OffsetDateTime.now() }
+    }
+
     private fun ResultRow.toRecord() =
         RefreshTokenRecord(
             id = this[RefreshTokensTable.id],

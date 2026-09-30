@@ -131,6 +131,18 @@ class OrderRepository {
         IssuedTicketsTable.selectAll().where { IssuedTicketsTable.userId eq userId }.orderBy(IssuedTicketsTable.issuedAt to SortOrder.DESC).map(::toTicket)
     }
 
+    fun ticketStats(eventId: UUID): CheckInStatsResponse = transaction {
+        val rows = IssuedTicketsTable.selectAll().where { IssuedTicketsTable.eventId eq eventId }.toList()
+        val used = rows.count { it[IssuedTicketsTable.status] == IssuedTicketStatus.USED.name }
+        val issued = rows.count { it[IssuedTicketsTable.status] == IssuedTicketStatus.ISSUED.name }
+        val cancelled = rows.count { it[IssuedTicketsTable.status] == IssuedTicketStatus.CANCELLED.name }
+        CheckInStatsResponse(eventId.toString(), rows.size, used, issued, cancelled)
+    }
+
+    fun findTicketByAdmissionToken(token: UUID): IssuedTicketResponse? = transaction {
+        IssuedTicketsTable.selectAll().where { IssuedTicketsTable.admissionToken eq token }.singleOrNull()?.let(::toTicket)
+    }
+
     fun checkIn(token: UUID): IssuedTicketResponse? = transaction {
         val row = IssuedTicketsTable.selectAll().where { IssuedTicketsTable.admissionToken eq token }.singleOrNull() ?: return@transaction null
         if (row[IssuedTicketsTable.status] != IssuedTicketStatus.ISSUED.name) throw IllegalStateException("Ticket has already been used or cancelled")
@@ -166,6 +178,7 @@ class OrderRepository {
     fun findById(id:UUID)=transaction{findByIdInternal(id)}
     fun findByUser(userId:UUID)=transaction{OrdersTable.selectAll().where{OrdersTable.userId eq userId}.orderBy(OrdersTable.createdAt to SortOrder.DESC).map(::toResponse)}
     fun findAll()=transaction{OrdersTable.selectAll().orderBy(OrdersTable.createdAt to SortOrder.DESC).map(::toResponse)}
+    fun allTicketStatuses(): List<IssuedTicketStatus> = transaction { IssuedTicketsTable.selectAll().map { IssuedTicketStatus.valueOf(it[IssuedTicketsTable.status]) } }
     private fun findByIdInternal(id:UUID)=OrdersTable.selectAll().where{OrdersTable.id eq id}.singleOrNull()?.let(::toResponse)
     private fun items(orderId:UUID)=OrderItemsTable.selectAll().where{OrderItemsTable.orderId eq orderId}.map{row->OrderItemResponse(id=row[OrderItemsTable.id].toString(), inventoryId=row[OrderItemsTable.inventoryId].toString(), reservationId=row[OrderItemsTable.reservationId]?.toString(), reservedUntil=row[OrderItemsTable.reservedUntil]?.toString(), eventId=row[OrderItemsTable.eventId].toString(), sectionId=row[OrderItemsTable.sectionId]?.toString(), seatId=row[OrderItemsTable.seatId]?.toString(), unitPrice=row[OrderItemsTable.unitPrice].toPlainString(), currency=row[OrderItemsTable.currency])}
     private fun toResponse(row:ResultRow):OrderResponse{val its=items(row[OrdersTable.id]);return OrderResponse(id=row[OrdersTable.id].toString(), userId=row[OrdersTable.userId]?.toString(), inventoryId=its.singleOrNull()?.inventoryId, reservationId=its.singleOrNull()?.reservationId, paymentId=row[OrdersTable.paymentId]?.toString(), amount=row[OrdersTable.amount].toPlainString(), currency=row[OrdersTable.currency], status=OrderStatus.valueOf(row[OrdersTable.status]), failureReason=row[OrdersTable.failureReason], items=its, reservedUntil=its.mapNotNull { it.reservedUntil }.minOrNull(), createdAt=row[OrdersTable.createdAt].toString(), updatedAt=row[OrdersTable.updatedAt].toString())}

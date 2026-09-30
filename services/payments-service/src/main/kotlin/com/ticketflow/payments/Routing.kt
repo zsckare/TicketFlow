@@ -19,11 +19,13 @@ fun Application.configureRouting(){
  suspend fun notifyOrder(payment:PaymentResponse){val email=repo.customerEmail(UUID.fromString(payment.id))?:return;client.post("$ordersUrl/internal/orders/${payment.orderId}/payment-succeeded"){header("X-Internal-Service-Secret",internalSecret);contentType(ContentType.Application.Json);setBody(mapOf("paymentId" to payment.id,"userEmail" to email))}}
  routing{
   get("/health"){call.respond(mapOf("status" to "UP","provider" to providerName))}
-  post("/checkout"){val r=call.receive<CreateCheckoutRequest>();require(r.idempotencyKey.isNotBlank());require(r.currency.length==3);var payment=repo.createPending(r,providerName);if(payment.status==PaymentStatus.SUCCEEDED)return@post call.respond(payment)
+  get("/metrics") { val all=repo.findAll(); val body=buildString { appendLine("# TYPE ticketflow_payments_total gauge"); PaymentStatus.entries.forEach { st -> appendLine("ticketflow_payments_total{status=\"${st.name.lowercase()}\"} ${all.count{it.status==st}}") } }; call.respondText(body, ContentType.Text.Plain) }
+  post("/checkout"){if(call.request.headers["X-Internal-Service-Secret"]!=internalSecret)return@post call.respond(HttpStatusCode.Unauthorized);val r=call.receive<CreateCheckoutRequest>();require(r.idempotencyKey.isNotBlank());require(r.currency.length==3);var payment=repo.createPending(r,providerName);if(payment.status==PaymentStatus.SUCCEEDED)return@post call.respond(payment)
    if(providerName=="SIMULATED"){payment=repo.markSucceeded(UUID.fromString(payment.id))!!;notifyOrder(payment);call.respond(HttpStatusCode.Created,payment)}else{if(payment.checkoutUrl==null){val s=provider!!.createCheckout(payment,r);payment=repo.attachSession(UUID.fromString(payment.id),s.id,s.url)};call.respond(HttpStatusCode.Created,payment)}}
   post("/payments/webhooks/stripe"){val payload=call.receiveText();val sig=call.request.headers["Stripe-Signature"]?:return@post call.respond(HttpStatusCode.BadRequest);if(webhookSecret.isBlank()||!verifyStripeSignature(payload,sig,webhookSecret))return@post call.respond(HttpStatusCode.BadRequest)
    val obj=Json.parseToJsonElement(payload).jsonObject;if(obj["type"]?.jsonPrimitive?.content=="checkout.session.completed"){val session=obj["data"]?.jsonObject?.get("object")?.jsonObject;val sid=session?.get("id")?.jsonPrimitive?.content; if(sid!=null){repo.markSucceededBySession(sid)?.let{notifyOrder(it)}}};call.respond(HttpStatusCode.OK)}
   post("/payments/{id}/refund"){
+   if(call.request.headers["X-Internal-Service-Secret"]!=internalSecret)return@post call.respond(HttpStatusCode.Unauthorized)
    val id=UUID.fromString(call.parameters["id"]);val existing=repo.findById(id)?:return@post call.respond(HttpStatusCode.NotFound)
    if(existing.status==PaymentStatus.SUCCEEDED && providerName=="STRIPE"){val sid=existing.providerSessionId?:error("Stripe payment has no checkout session");provider!!.refund(sid)}
    call.respond(repo.refund(id)!!)

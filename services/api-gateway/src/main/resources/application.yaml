@@ -7,6 +7,7 @@ ktor:
       - com.ticketflow.gateway.StatusPagesKt.configureStatusPages
       - com.ticketflow.gateway.DatabaseKt.configureDatabase
       - com.ticketflow.gateway.CorsKt.configureCors
+      - com.ticketflow.gateway.SecurityHeadersKt.configureSecurityHeaders
       - com.ticketflow.gateway.RoutingKt.configureRouting
 services:
   events: "$EVENTS_SERVICE_URL:http://localhost:8081"

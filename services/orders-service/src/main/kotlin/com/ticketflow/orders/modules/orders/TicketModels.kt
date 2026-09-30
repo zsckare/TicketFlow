@@ -51,4 +51,14 @@ data class IssuedTicketResponse(
 @Serializable
 data class CheckInRequest(
     val qrPayload: String,
+    val eventId: String? = null,
+)
+
+@Serializable
+data class CheckInStatsResponse(
+    val eventId: String,
+    val total: Int,
+    val checkedIn: Int,
+    val pending: Int,
+    val cancelled: Int,
 )

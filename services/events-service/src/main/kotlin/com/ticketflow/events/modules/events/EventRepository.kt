@@ -121,6 +121,17 @@ class EventRepository {
             .singleOrNull()
     }
 
+    fun update(id: UUID, name: String, description: String?, startsAt: OffsetDateTime, endsAt: OffsetDateTime?): EventResponse? = transaction {
+        val count = EventsTable.update({ EventsTable.id eq id }) {
+            it[EventsTable.name] = name
+            it[EventsTable.description] = description
+            it[EventsTable.startsAt] = startsAt
+            it[EventsTable.endsAt] = endsAt
+            it[updatedAt] = OffsetDateTime.now()
+        }
+        if (count == 0) null else EventsTable.selectAll().where { EventsTable.id eq id }.single().let(::toResponse)
+    }
+
     fun delete(id: UUID): Boolean = transaction {
         EventsTable.deleteWhere { EventsTable.id eq id } > 0
     }

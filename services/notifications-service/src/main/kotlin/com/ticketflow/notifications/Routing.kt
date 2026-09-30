@@ -13,6 +13,11 @@ fun Application.configureRouting() {
     val repository = NotificationRepository()
     routing {
         get("/health") { call.respond(mapOf("status" to "UP")) }
+        get("/metrics") {
+            val counts = repository.statusCounts()
+            val body = buildString { appendLine("# TYPE ticketflow_notifications_total gauge"); counts.forEach { (status,count) -> appendLine("ticketflow_notifications_total{status=\"${status.name.lowercase()}\"} $count") } }
+            call.respondText(body, ContentType.Text.Plain)
+        }
         authenticate("auth-jwt") {
             get("/notifications/me") {
                 val principal = call.principal<JWTPrincipal>()!!

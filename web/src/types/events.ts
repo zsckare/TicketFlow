@@ -22,3 +22,5 @@ export interface CreateSeatRequest { row: string; number: string }
 export interface CreateEventRequest {
   venueId: string; name: string; description?: string; startsAt: string; endsAt: string
 }
+
+export interface UpdateEventRequest { name:string; description?:string; startsAt:string; endsAt?:string }

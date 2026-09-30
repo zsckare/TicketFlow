@@ -37,6 +37,11 @@ class NotificationRepository {
 
     fun find(id: UUID): NotificationResponse? = transaction { findInternal(id) }
 
+    fun statusCounts(): Map<NotificationStatus, Int> = transaction {
+        val rows = NotificationsTable.selectAll().toList()
+        NotificationStatus.entries.associateWith { status -> rows.count { it[NotificationsTable.status] == status.name } }
+    }
+
     fun byUser(id: UUID): List<NotificationResponse> = transaction {
         NotificationsTable.selectAll().where { NotificationsTable.userId eq id }
             .orderBy(NotificationsTable.createdAt to SortOrder.DESC).map(::toResponse)

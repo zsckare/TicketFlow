@@ -85,6 +85,31 @@ class UserRepository {
   }
  }
 
+
+ fun updateProfile(id: UUID, first: String, last: String): UserResponse? = transaction {
+  val count = UsersTable.update({ UsersTable.id eq id }) {
+   it[UsersTable.firstName] = first
+   it[UsersTable.lastName] = last
+   it[UsersTable.updatedAt] = OffsetDateTime.now()
+  }
+  if (count == 0) null else findByIdInternal(id)?.response
+ }
+
+ fun updateRole(id: UUID, newRole: UserRole): UserResponse? = transaction {
+  val count = UsersTable.update({ UsersTable.id eq id }) {
+   it[UsersTable.role] = newRole.name
+   it[UsersTable.updatedAt] = OffsetDateTime.now()
+  }
+  if (count == 0) null else findByIdInternal(id)?.response
+ }
+
+ fun updatePassword(id: UUID, hash: String): Boolean = transaction {
+  UsersTable.update({ UsersTable.id eq id }) {
+   it[UsersTable.passwordHash] = hash
+   it[UsersTable.updatedAt] = OffsetDateTime.now()
+  } > 0
+ }
+
  private fun findByIdInternal(
   id: UUID,
  ): UserRecord? =

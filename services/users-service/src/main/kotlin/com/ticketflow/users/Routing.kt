@@ -20,6 +20,8 @@ fun Application.configureRouting() {
     val refreshTokens = RefreshTokenRepository()
     val auth = AuthService(repo, refreshTokens, environment.config)
     val config = environment.config
+    val loginLimiter = SimpleRateLimiter(limit = 10, windowMs = 60_000)
+    val refreshLimiter = SimpleRateLimiter(limit = 30, windowMs = 60_000)
 
     val refreshDays = config
         .property("jwt.refreshExpiresDays")
@@ -75,6 +77,8 @@ fun Application.configureRouting() {
         }
 
         post("/auth/login") {
+            val key = call.request.local.remoteHost
+            if (!loginLimiter.allow(key)) return@post call.respond(HttpStatusCode.TooManyRequests, ErrorResponse("Too many login attempts"))
             val session = auth.login(call.receive())
             call.setRefreshCookie(
                 token = session.refreshToken,
@@ -89,6 +93,8 @@ fun Application.configureRouting() {
          * credential used to create a fresh short-lived access token.
          */
         post("/auth/refresh") {
+            val key = call.request.local.remoteHost
+            if (!refreshLimiter.allow(key)) return@post call.respond(HttpStatusCode.TooManyRequests, ErrorResponse("Too many refresh attempts"))
             val rawRefreshToken = call.request.cookies[REFRESH_COOKIE_NAME]
                 ?: throw SecurityException("Refresh token is missing")
 
@@ -149,6 +155,43 @@ fun Application.configureRouting() {
                     repo.updateStatus(id, request.status)
                         ?: return@patch call.respond(HttpStatusCode.NotFound),
                 )
+            }
+
+            route("/users/admin") {
+                get { requireAdmin(call); call.respond(repo.findAll()) }
+                post {
+                    requireAdmin(call)
+                    call.respond(HttpStatusCode.Created, auth.createInternalUser(call.receive()))
+                }
+                patch("/{id}") {
+                    requireAdmin(call)
+                    val id = UUID.fromString(call.parameters["id"])
+                    val request = call.receive<UpdateUserRequest>()
+                    call.respond(repo.updateProfile(id, request.firstName.trim(), request.lastName.trim()) ?: return@patch call.respond(HttpStatusCode.NotFound))
+                }
+                patch("/{id}/role") {
+                    requireAdmin(call)
+                    val principalId = UUID.fromString(call.principal<JWTPrincipal>()!!.payload.subject)
+                    val id = UUID.fromString(call.parameters["id"])
+                    val request = call.receive<UpdateRoleRequest>()
+                    require(request.role != UserRole.CUSTOMER) { "Internal role must be STAFF or ADMIN" }
+                    require(id != principalId || request.role == UserRole.ADMIN) { "You cannot remove your own ADMIN role" }
+                    call.respond(repo.updateRole(id, request.role) ?: return@patch call.respond(HttpStatusCode.NotFound))
+                }
+                patch("/{id}/status") {
+                    requireAdmin(call)
+                    val principalId = UUID.fromString(call.principal<JWTPrincipal>()!!.payload.subject)
+                    val id = UUID.fromString(call.parameters["id"])
+                    val request = call.receive<UpdateStatusRequest>()
+                    require(id != principalId || request.status == UserStatus.ACTIVE) { "You cannot disable your own account" }
+                    call.respond(repo.updateStatus(id, request.status) ?: return@patch call.respond(HttpStatusCode.NotFound))
+                }
+                post("/{id}/reset-password") {
+                    requireAdmin(call)
+                    val id = UUID.fromString(call.parameters["id"])
+                    auth.resetPassword(id, call.receive<ResetPasswordRequest>().password)
+                    call.respond(HttpStatusCode.NoContent)
+                }
             }
         }
     }

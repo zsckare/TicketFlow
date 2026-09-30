@@ -86,6 +86,21 @@ class EventService(
     ): EventResponse? =
         eventRepository.findById(id)
 
+    fun update(id: UUID, request: UpdateEventRequest): EventResponse {
+        val current = eventRepository.findById(id) ?: error("Event does not exist")
+        require(current.status == EventStatus.DRAFT) { "Only DRAFT events can be edited" }
+        require(request.name.isNotBlank()) { "Event name cannot be blank" }
+        val startsAt = parseDateTime(request.startsAt, "startsAt")
+        val endsAt = request.endsAt?.let { parseDateTime(it, "endsAt") }
+        require(endsAt == null || endsAt.isAfter(startsAt)) { "Event end date must be after start date" }
+        return eventRepository.update(id, request.name.trim(), request.description?.trim()?.takeIf { it.isNotEmpty() }, startsAt, endsAt)!!
+    }
+
+    fun cloneAsDraft(id: UUID): EventResponse {
+        val source = eventRepository.findById(id) ?: error("Event does not exist")
+        return eventRepository.create(UUID.fromString(source.venueId), "${source.name} (copia)", source.description, OffsetDateTime.parse(source.startsAt), source.endsAt?.let(OffsetDateTime::parse))
+    }
+
     /**
      * Publica un evento.
      *

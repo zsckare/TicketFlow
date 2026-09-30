@@ -7,7 +7,10 @@ import com.ticketflow.orders.modules.orders.OrderRepository
 import com.ticketflow.orders.modules.orders.OrderService
 import com.ticketflow.orders.modules.orders.orderRoutes
 import io.ktor.server.application.Application
-import io.ktor.server.routing.routing
+import io.ktor.server.application.call
+import io.ktor.server.routing.*
+import io.ktor.server.response.respondText
+import io.ktor.http.ContentType
 
 /**
  * Configures the HTTP routes exposed by Orders Service and wires all
@@ -21,9 +24,13 @@ fun Application.configureRouting() {
         baseUrl = config.property("services.tickets.baseUrl").getString(),
     )
 
+    val internalSecret = config.propertyOrNull("services.internalSecret")?.getString()
+        ?: System.getenv("INTERNAL_SERVICE_SECRET") ?: "ticketflow-internal-dev-secret"
+
     val paymentsClient = PaymentsClient(
         httpClient = serviceHttpClient,
         baseUrl = config.property("services.payments.baseUrl").getString(),
+        internalSecret = internalSecret,
     )
 
     val eventsClient = EventsClient(
@@ -49,13 +56,10 @@ fun Application.configureRouting() {
      * Payments Service sends this value when notifying Orders Service that
      * the payment provider has confirmed a payment.
      */
-    val internalSecret = config.propertyOrNull("services.internalSecret")
-        ?.getString()
-        ?: System.getenv("INTERNAL_SERVICE_SECRET")
-        ?: "ticketflow-internal-dev-secret"
 
+    val repository = OrderRepository()
     val orderService = OrderService(
-        repository = OrderRepository(),
+        repository = repository,
         ticketsClient = ticketsClient,
         paymentsClient = paymentsClient,
         eventsClient = eventsClient,
@@ -63,6 +67,27 @@ fun Application.configureRouting() {
     )
 
     routing {
+        get("/metrics") {
+            val orders = repository.findAll()
+            val tickets = repository.allTicketStatuses()
+            val confirmed = orders.count { it.status.name == "CONFIRMED" }
+            val reserved = orders.count { it.status.name == "RESERVED" }
+            val failed = orders.count { it.status.name == "FAILED" }
+            val used = tickets.count { it.name == "USED" }
+            val issued = tickets.count { it.name == "ISSUED" }
+            val body = buildString {
+                appendLine("# HELP ticketflow_orders_total Orders by status")
+                appendLine("# TYPE ticketflow_orders_total gauge")
+                appendLine("ticketflow_orders_total{status=\"confirmed\"} $confirmed")
+                appendLine("ticketflow_orders_total{status=\"reserved\"} $reserved")
+                appendLine("ticketflow_orders_total{status=\"failed\"} $failed")
+                appendLine("# HELP ticketflow_checkins_total Used tickets")
+                appendLine("# TYPE ticketflow_checkins_total gauge")
+                appendLine("ticketflow_checkins_total $used")
+                appendLine("ticketflow_tickets_pending_checkin $issued")
+            }
+            call.respondText(body, ContentType.Text.Plain)
+        }
         orderRoutes(
             service = orderService,
             internalSecret = internalSecret,

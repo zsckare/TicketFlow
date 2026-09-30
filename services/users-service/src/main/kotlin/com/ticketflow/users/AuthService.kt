@@ -56,6 +56,24 @@ class AuthService(
         return createSession(user)
     }
 
+    fun createInternalUser(request: CreateInternalUserRequest): UserResponse {
+        require(request.role == UserRole.ADMIN || request.role == UserRole.STAFF) { "Internal users must be ADMIN or STAFF" }
+        val email = request.email.trim().lowercase()
+        require(email.contains('@')) { "Invalid email" }
+        require(request.password.length >= 10) { "Password must have at least 10 characters" }
+        require(request.firstName.isNotBlank() && request.lastName.isNotBlank()) { "Name is required" }
+        if (repo.findByEmail(email) != null) throw IllegalStateException("Email already registered")
+        val hash = BCrypt.withDefaults().hashToString(12, request.password.toCharArray())
+        return repo.create(email, hash, request.firstName.trim(), request.lastName.trim(), request.role)
+    }
+
+    fun resetPassword(userId: UUID, password: String) {
+        require(password.length >= 10) { "Password must have at least 10 characters" }
+        val hash = BCrypt.withDefaults().hashToString(12, password.toCharArray())
+        if (!repo.updatePassword(userId, hash)) throw NoSuchElementException("User not found")
+        refreshTokens.revokeAllForUser(userId)
+    }
+
     fun login(request: LoginRequest): AuthSession {
         val userRecord = repo.findByEmail(
             request.email.trim().lowercase(),

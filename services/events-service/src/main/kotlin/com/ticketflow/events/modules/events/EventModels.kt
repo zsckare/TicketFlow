@@ -42,6 +42,15 @@ data class CreateEventRequest(
     val endsAt: String? = null,
 )
 
+
+@Serializable
+data class UpdateEventRequest(
+    val name: String,
+    val description: String? = null,
+    val startsAt: String,
+    val endsAt: String? = null,
+)
+
 /**
  * Representación pública de un evento.
  */

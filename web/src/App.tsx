@@ -88,6 +88,8 @@ import {
     CheckInPage,
 } from './pages/admin/CheckInPage'
 
+import { UsersPage } from './pages/admin/UsersPage'
+
 export default function App() {
     return (
         <Routes>
@@ -203,6 +205,8 @@ export default function App() {
                     }
                 />
 
+                <Route path="staff/check-in" element={<ProtectedRoute role="STAFF"><main className="page"><CheckInPage /></main></ProtectedRoute>} />
+
                 {/* Administration */}
                 <Route
                     path="admin"
@@ -262,6 +266,8 @@ export default function App() {
                             <OrdersPage />
                         }
                     />
+
+                    <Route path="users" element={<UsersPage />} />
 
                     <Route
                         path="check-in"

@@ -14,6 +14,7 @@ class PaymentRepository{
  fun findById(id:UUID)=transaction{findByIdInternal(id)}
  fun refund(id:UUID):PaymentResponse?=transaction{val e=findByIdInternal(id)?:return@transaction null;if(e.status==PaymentStatus.REFUNDED)return@transaction e;if(e.status!=PaymentStatus.SUCCEEDED)throw IllegalStateException("Only SUCCEEDED payments can be refunded");PaymentsTable.update({PaymentsTable.id eq id}){it[status]=PaymentStatus.REFUNDED.name;it[updatedAt]=OffsetDateTime.now(ZoneOffset.UTC)};findByIdInternal(id)}
  fun findByOrder(id:UUID)=transaction{PaymentsTable.selectAll().where{PaymentsTable.orderId eq id}.map{it.response()}}
+ fun findAll()=transaction{PaymentsTable.selectAll().map{it.response()}}
  private fun findByKeyInternal(k:String)=PaymentsTable.selectAll().where{PaymentsTable.idempotencyKey eq k}.singleOrNull()?.response()
  private fun findByIdInternal(id:UUID)=PaymentsTable.selectAll().where{PaymentsTable.id eq id}.singleOrNull()?.response()
  private fun ResultRow.response()=PaymentResponse(this[PaymentsTable.id].toString(),this[PaymentsTable.orderId].toString(),this[PaymentsTable.userId].toString(),this[PaymentsTable.amount].toPlainString(),this[PaymentsTable.currency],PaymentStatus.valueOf(this[PaymentsTable.status]),this[PaymentsTable.idempotencyKey],this[PaymentsTable.provider],this[PaymentsTable.checkoutUrl],this[PaymentsTable.providerSessionId],this[PaymentsTable.createdAt].toString(),this[PaymentsTable.updatedAt].toString())

@@ -211,14 +211,24 @@ class OrderService(
     suspend fun findTickets(userId: UUID): List<IssuedTicketResponse> =
         repository.findTicketsByUser(userId).map { enrich(it) }
 
-    suspend fun checkIn(payload: String, isAdmin: Boolean): IssuedTicketResponse {
-        if (!isAdmin) throw SecurityException("ADMIN role required")
+    fun checkInStats(eventId: UUID, isOperator: Boolean): CheckInStatsResponse {
+        if (!isOperator) throw SecurityException("STAFF or ADMIN role required")
+        return repository.ticketStats(eventId)
+    }
+
+    suspend fun checkIn(payload: String, expectedEventId: UUID?, isOperator: Boolean): IssuedTicketResponse {
+        if (!isOperator) throw SecurityException("STAFF or ADMIN role required")
 
         val token = verifyQrPayload(payload)
             ?: throw OrderOperationException("Invalid or tampered ticket QR")
 
         // Repository.checkIn performs an atomic ISSUED -> USED compare-and-set.
         // Two scanners racing with the same QR cannot both admit the attendee.
+        val ticketBefore = repository.findTicketByAdmissionToken(token)
+            ?: throw OrderOperationException("Ticket not found")
+        if (expectedEventId != null && ticketBefore.eventId != expectedEventId.toString()) {
+            throw OrderOperationException("Ticket belongs to a different event")
+        }
         val ticket = repository.checkIn(token)
             ?: throw OrderOperationException("Ticket not found")
 

@@ -9,8 +9,11 @@ import io.ktor.server.request.*
 import io.ktor.server.response.respond
 import io.ktor.server.routing.*
 import java.util.UUID
+import com.ticketflow.orders.SimpleRateLimiter
 
 fun Route.orderRoutes(service: OrderService, internalSecret: String) {
+    val checkoutLimiter = SimpleRateLimiter(20, 60_000)
+    val checkInLimiter = SimpleRateLimiter(120, 60_000)
     post("/internal/orders/{orderId}/payment-succeeded") {
         if (call.request.headers["X-Internal-Service-Secret"] != internalSecret) return@post call.respond(HttpStatusCode.Unauthorized)
         val orderId = parseUuid(call.parameters["orderId"]) ?: return@post call.respond(HttpStatusCode.BadRequest)
@@ -53,16 +56,20 @@ fun Route.orderRoutes(service: OrderService, internalSecret: String) {
                 call.respond(service.findTickets(UUID.fromString(principal.payload.subject)))
             }
 
+            get("/tickets/check-in/stats/{eventId}") {
+                val principal = call.principal<JWTPrincipal>()!!
+                val eventId = parseUuid(call.parameters["eventId"])
+                    ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid eventId"))
+                call.respond(service.checkInStats(eventId, principal.isOperator()))
+            }
+
             post("/tickets/check-in") {
                 val principal = call.principal<JWTPrincipal>()!!
+                if (!checkInLimiter.allow(principal.payload.subject)) return@post call.respond(HttpStatusCode.TooManyRequests, mapOf("error" to "Too many check-in attempts"))
                 val request = call.receive<CheckInRequest>()
-
-                call.respond(
-                    service.checkIn(
-                        request.qrPayload,
-                        principal.isAdmin(),
-                    ),
-                )
+                val expectedEventId = request.eventId?.let(::parseUuid)
+                if (request.eventId != null && expectedEventId == null) return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid eventId"))
+                call.respond(service.checkIn(request.qrPayload, expectedEventId, principal.isOperator()))
             }
 
             get("/{orderId}") {
@@ -75,6 +82,7 @@ fun Route.orderRoutes(service: OrderService, internalSecret: String) {
 
             post("/{orderId}/checkout") {
                 val principal = call.principal<JWTPrincipal>()!!
+                if (!checkoutLimiter.allow(principal.payload.subject)) return@post call.respond(HttpStatusCode.TooManyRequests, mapOf("error" to "Too many checkout attempts"))
                 val userId = UUID.fromString(principal.payload.subject)
                 val userEmail = principal.payload.getClaim("email").asString() ?: return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to "JWT has no email claim"))
                 val orderId = parseUuid(call.parameters["orderId"]) ?: return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid orderId"))
@@ -92,8 +100,8 @@ fun Route.orderRoutes(service: OrderService, internalSecret: String) {
     }
 }
 
-private fun JWTPrincipal.isAdmin(): Boolean =
-    payload.getClaim("role").asString() == "ADMIN"
+private fun JWTPrincipal.isAdmin(): Boolean = payload.getClaim("role").asString() == "ADMIN"
+private fun JWTPrincipal.isOperator(): Boolean = payload.getClaim("role").asString() in setOf("ADMIN", "STAFF")
 
 private fun parseUuid(value: String?): UUID? =
     try {
